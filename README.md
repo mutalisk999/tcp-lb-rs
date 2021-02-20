@@ -1,2 +1,2 @@
-# tcp_lb.rs
+# tcp_lb.rust
 tcp load balancer written by rust
