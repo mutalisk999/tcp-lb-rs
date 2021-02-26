@@ -1,0 +1,8 @@
+[package]
+name = "tcp_lb_rs"
+version = "0.1.0"
+authors = ["mutalisk <0x08@0x08.net>"]
+edition = "2018"
+
+[dependencies]
+tokio = { version = "1.2.0", features = ["full"] }
