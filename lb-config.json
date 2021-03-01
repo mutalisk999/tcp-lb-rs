@@ -1,0 +1,22 @@
+{
+    "lb_log": {
+        "log_set_level": 10
+    },
+    "lb_node": {
+        "listen": "",
+        "max_conn": 0,
+        "timeout": 0
+    },
+    "lb_targets": [
+        {
+            "target_endpoint": "",
+            "target_max_conn": 0,
+            "target_timeout": 0
+        },
+        {
+            "target_endpoint": "",
+            "target_max_conn": 0,
+            "target_timeout": 0
+        }
+    ]
+}

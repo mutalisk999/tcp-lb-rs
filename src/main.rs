@@ -1,8 +1,7 @@
-mod proxy;
-
 extern crate tokio;
 
-use crate::proxy::{start_tcp_proxy, start_tcp_proxy2};
+mod proxy;
+use proxy::proxy::{start_tcp_proxy, start_tcp_proxy2};
 
 #[tokio::main]
 async fn main() {
