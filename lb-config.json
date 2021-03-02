@@ -3,20 +3,20 @@
         "log_set_level": 10
     },
     "lb_node": {
-        "listen": "",
-        "max_conn": 0,
-        "timeout": 0
+        "listen": "0.0.0.0:8080",
+        "max_conn": 10000,
+        "timeout": 60
     },
     "lb_targets": [
         {
-            "target_endpoint": "",
-            "target_max_conn": 0,
-            "target_timeout": 0
+            "target_endpoint": "192.168.1.121:8080",
+            "target_max_conn": 1000,
+            "target_timeout": 60
         },
         {
-            "target_endpoint": "",
-            "target_max_conn": 0,
-            "target_timeout": 0
+            "target_endpoint": "192.168.1.122:8080",
+            "target_max_conn": 1000,
+            "target_timeout": 60
         }
     ]
 }

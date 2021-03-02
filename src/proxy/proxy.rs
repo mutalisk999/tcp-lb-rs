@@ -2,18 +2,35 @@ use tokio::net::TcpListener;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::error::Error;
 
-pub async fn start_tcp_proxy() -> Result<(), Box<dyn Error>>{
-    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+use crate::proxy::config::Config;
+use std::collections::HashMap;
+use tokio::sync::Mutex;
+use std::sync::Arc;
+use crate::proxy::connection::{NodeConnection, TargetConnection};
+use crate::proxy::target::Target;
+
+pub async fn start_tcp_proxy(config: &Config, targets: Arc<Mutex<HashMap<String, Target>>>,
+                             conn_pair_n2t: Arc<Mutex<HashMap<Arc<Mutex<NodeConnection>>, Arc<Mutex<TargetConnection>>>>>,
+                             conn_pair_t2n: Arc<Mutex<HashMap<Arc<Mutex<TargetConnection>>, Arc<Mutex<NodeConnection>>>>>
+    ) -> Result<(), Box<dyn Error>>{
+
+    let listener = TcpListener::bind(config.lb_node.listen.as_str())
+        .await.expect(format!("Failure binding node listen endpoint [{}]", config.lb_node.listen).as_str());
 
     loop {
-        let (mut socket, _) = listener.accept().await?;
+        let (mut socket, remote_addr) = listener.accept().await?;
+        let conn = Arc::new(Mutex::new(NodeConnection::new(socket)));
+        println!("remote connection from {}", remote_addr);
+
+
 
         tokio::spawn(async move {
+
             let mut buf = [0; 1024];
 
             // In a loop, read data from the socket and write the data back.
             loop {
-                let n = match socket.read(&mut buf).await {
+                let n = match conn.lock().await.connection.tcp_stream.read(&mut buf).await {
                     // socket closed
                     Ok(n) if n == 0 => return,
                     Ok(n) => n,
@@ -24,39 +41,7 @@ pub async fn start_tcp_proxy() -> Result<(), Box<dyn Error>>{
                 };
 
                 // Write the data back
-                if let Err(e) = socket.write_all(&buf[0..n]).await {
-                    eprintln!("failed to write to socket; err = {:?}", e);
-                    return;
-                }
-            }
-        });
-    }
-}
-
-
-pub async fn start_tcp_proxy2() -> Result<(), Box<dyn Error>>{
-    let listener = TcpListener::bind("127.0.0.1:8081").await?;
-
-    loop {
-        let (mut socket, _) = listener.accept().await?;
-
-        tokio::spawn(async move {
-            let mut buf = [0; 1024];
-
-            // In a loop, read data from the socket and write the data back.
-            loop {
-                let n = match socket.read(&mut buf).await {
-                    // socket closed
-                    Ok(n) if n == 0 => return,
-                    Ok(n) => n,
-                    Err(e) => {
-                        eprintln!("failed to read from socket; err = {:?}", e);
-                        return;
-                    }
-                };
-
-                // Write the data back
-                if let Err(e) = socket.write_all(&buf[0..n]).await {
+                if let Err(e) = conn.lock().await.connection.tcp_stream.write_all(&buf[0..n]).await {
                     eprintln!("failed to write to socket; err = {:?}", e);
                     return;
                 }
