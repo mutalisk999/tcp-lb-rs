@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
 use tokio::net::TcpStream;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 
 #[derive(Debug)]
@@ -60,4 +62,15 @@ impl TargetConnection {
             target_id,
         }
     }
+}
+
+pub async fn get_target_conn_count_by_target_id(target_id: String,
+                                                conn_pair_t2n: Arc<Mutex<HashMap<Arc<Mutex<TargetConnection>>, Arc<Mutex<NodeConnection>>>>>) -> u32 {
+    let mut target_conn: u32 = 0;
+    for (k, _) in conn_pair_t2n.lock().await.iter() {
+        if k.lock().await.target_id == target_id {
+            target_conn += 1;
+        }
+    }
+    target_conn
 }

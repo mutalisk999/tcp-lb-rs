@@ -32,6 +32,7 @@ pub struct TargetConfig {
     pub target_endpoint: String,
     pub target_max_conn: u32,
     pub target_timeout: u32,
+    pub target_active: bool,
 }
 
 impl Config {
