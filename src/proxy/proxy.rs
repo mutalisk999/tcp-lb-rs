@@ -6,25 +6,44 @@ use crate::proxy::config::Config;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 use std::sync::Arc;
-use crate::proxy::connection::{NodeConnection, TargetConnection};
-use crate::proxy::target::{Target, dump_targets};
 use tokio::time::Duration;
 use std::borrow::{BorrowMut, Borrow};
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 
-pub async fn start_tcp_proxy(config: &Config, targets: Arc<Mutex<HashMap<String, Target>>>,
-                             conn_pair_n2t: Arc<Mutex<HashMap<Arc<Mutex<NodeConnection>>, Arc<Mutex<TargetConnection>>>>>,
-                             conn_pair_t2n: Arc<Mutex<HashMap<Arc<Mutex<TargetConnection>>, Arc<Mutex<NodeConnection>>>>>
+use crate::proxy::connection::{NodeConnection, TargetConnection};
+use crate::proxy::target::{Target, dump_targets};
+use crate::proxy::config::{read_config};
+
+
+#[derive(Debug)]
+pub struct ProxyServer {
+    pub server_config: Config,
+    pub targets_info: Arc<Mutex<HashMap<String, Target>>>,
+    pub connections_info: Arc<Mutex<Vec<(NodeConnection, TargetConnection)>>>,
+}
+
+impl ProxyServer {
+    pub fn new() -> ProxyServer{
+        ProxyServer {
+            server_config: read_config(),
+            targets_info: Arc::new(Mutex::new(HashMap::new())),
+            connections_info: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+}
+
+
+pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
     ) -> Result<(), Box<dyn Error>>{
 
-    let node_listener = TcpListener::bind(config.lb_node.listen.as_str())
-        .await.expect(format!("Failure binding node listen endpoint [{}]", config.lb_node.listen).as_str());
+    let node_listener = TcpListener::bind(proxy_server.server_config.lb_node.listen.as_str())
+        .await.expect(format!("Failure binding node listen endpoint [{}]", proxy_server.server_config.lb_node.listen).as_str());
 
     loop {
         let (mut tcp_stream_accept, remote_addr) = node_listener.accept().await?;
         println!("remote connection from {}", remote_addr);
 
-        let targets_dump = dump_targets(targets.clone(), conn_pair_t2n.clone()).await;
+        let targets_dump = dump_targets(proxy_server).await;
         let mut socket_conn: Option<TcpSocket> = None;
         let mut tcp_stream_conn: Option<TcpStream> = None;
         let mut conn_target_id: Option<String> = None;

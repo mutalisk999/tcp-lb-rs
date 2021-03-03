@@ -1,13 +1,16 @@
 use std::collections::HashMap;
-
 use tokio::net::TcpStream;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+
+use crate::proxy::proxy::{ProxyServer};
 
 
 #[derive(Debug)]
 pub struct Connection {
-    pub tcp_stream: TcpStream,
+    pub tcp_stream_read: Arc<Mutex<OwnedReadHalf>>,
+    pub tcp_stream_write: Arc<Mutex<OwnedWriteHalf>>,
     pub start_time_1m: i64,
     pub start_time_5m: i64,
     pub start_time_30m: i64,
@@ -20,9 +23,10 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(tcp_stream: TcpStream) -> Connection {
+    pub fn new(tcp_stream_read: Arc<Mutex<OwnedReadHalf>>, tcp_stream_write: Arc<Mutex<OwnedWriteHalf>>) -> Connection {
         Connection {
-            tcp_stream,
+            tcp_stream_read,
+            tcp_stream_write,
             start_time_1m: 0,
             start_time_5m: 0,
             start_time_30m: 0,
@@ -42,9 +46,9 @@ pub struct NodeConnection {
 }
 
 impl NodeConnection {
-    pub fn new(tcp_stream: TcpStream) -> NodeConnection {
+    pub fn new(tcp_stream_read: Arc<Mutex<OwnedReadHalf>>, tcp_stream_write: Arc<Mutex<OwnedWriteHalf>>) -> NodeConnection {
         NodeConnection {
-            connection: Connection::new(tcp_stream),
+            connection: Connection::new(tcp_stream_read, tcp_stream_write),
         }
     }
 }
@@ -56,19 +60,18 @@ pub struct TargetConnection {
 }
 
 impl TargetConnection {
-    pub fn new(tcp_stream: TcpStream, target_id: String) -> TargetConnection {
+    pub fn new(tcp_stream_read: Arc<Mutex<OwnedReadHalf>>, tcp_stream_write: Arc<Mutex<OwnedWriteHalf>>, target_id: String) -> TargetConnection {
         TargetConnection {
-            connection: Connection::new(tcp_stream),
+            connection: Connection::new(tcp_stream_read, tcp_stream_write),
             target_id,
         }
     }
 }
 
-pub async fn get_target_conn_count_by_target_id(target_id: String,
-                                                conn_pair_t2n: Arc<Mutex<HashMap<Arc<Mutex<TargetConnection>>, Arc<Mutex<NodeConnection>>>>>) -> u32 {
+pub async fn get_target_conn_count_by_target_id(target_id: String, proxy_server: &ProxyServer) -> u32 {
     let mut target_conn: u32 = 0;
-    for (k, _) in conn_pair_t2n.lock().await.iter() {
-        if k.lock().await.target_id == target_id {
+    for (_, v) in proxy_server.connections_info.lock().await.iter() {
+        if v.target_id == target_id {
             target_conn += 1;
         }
     }
