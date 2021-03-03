@@ -9,13 +9,13 @@
     },
     "lb_targets": [
         {
-            "target_endpoint": "192.168.1.121:8080",
+            "target_endpoint": "123.129.224.139:8080",
             "target_max_conn": 1000,
             "target_timeout": 60,
             "target_active": true
         },
         {
-            "target_endpoint": "192.168.1.122:8080",
+            "target_endpoint": "123.129.224.139:8080",
             "target_max_conn": 1000,
             "target_timeout": 60,
             "target_active": true
