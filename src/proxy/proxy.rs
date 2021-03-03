@@ -9,6 +9,8 @@ use std::sync::Arc;
 use crate::proxy::connection::{NodeConnection, TargetConnection};
 use crate::proxy::target::{Target, dump_targets};
 use tokio::time::Duration;
+use std::borrow::{BorrowMut, Borrow};
+use tokio::net::tcp::{ReadHalf, WriteHalf};
 
 pub async fn start_tcp_proxy(config: &Config, targets: Arc<Mutex<HashMap<String, Target>>>,
                              conn_pair_n2t: Arc<Mutex<HashMap<Arc<Mutex<NodeConnection>>, Arc<Mutex<TargetConnection>>>>>,
@@ -62,19 +64,18 @@ pub async fn start_tcp_proxy(config: &Config, targets: Arc<Mutex<HashMap<String,
         let conn_target_id = conn_target_id.unwrap();
         let mut tcp_stream_conn = tcp_stream_conn.unwrap();
 
-        let accept_connection = Arc::new(Mutex::new(NodeConnection::new(tcp_stream_accept)));
-        let conn_connection  = Arc::new(Mutex::new(TargetConnection::new(tcp_stream_conn, conn_target_id)));
+        let (mut tcp_stream_accept_read, mut tcp_stream_accept_write) = tcp_stream_accept.into_split();
+        let (mut tcp_stream_conn_read, mut tcp_stream_conn_write) = tcp_stream_conn.into_split();
 
-        let accept_connection_t1 = accept_connection.clone();
-        let conn_connection_t1 = conn_connection.clone();
-        let accept_connection_t2 = accept_connection.clone();
-        let conn_connection_t2 = conn_connection.clone();
+        let accept_connection_read = Arc::new(Mutex::new(tcp_stream_accept_read));
+        let accept_connection_write = Arc::new(Mutex::new(tcp_stream_accept_write));
+        let conn_connection_read  = Arc::new(Mutex::new(tcp_stream_conn_read));
+        let conn_connection_write  = Arc::new(Mutex::new(tcp_stream_conn_write));
 
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             loop {
-                println!("aaa in");
-                let n = match accept_connection_t1.lock().await.connection.tcp_stream.read(&mut buf).await {
+                let n = match accept_connection_read.lock().await.read(&mut buf).await {
                     Ok(n) if n == 0 => return,
                     Ok(n) => n,
                     Err(e) => {
@@ -82,21 +83,18 @@ pub async fn start_tcp_proxy(config: &Config, targets: Arc<Mutex<HashMap<String,
                         return;
                     }
                 };
-                println!("aaa: read {}", n);
 
-                if let Err(e) = conn_connection_t1.lock().await.connection.tcp_stream.write_all(&buf[0..n]).await {
+                if let Err(e) = conn_connection_write.lock().await.write_all(&buf[0..n]).await {
                     eprintln!("failed to write to socket; err = {:?}", e);
                     return;
                 }
-                println!("aaa: write");
             }
         });
 
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             loop {
-                println!("bbb in");
-                let n = match conn_connection_t2.lock().await.connection.tcp_stream.read(&mut buf).await {
+                let n = match conn_connection_read.lock().await.read(&mut buf).await {
                     Ok(n) if n == 0 => return,
                     Ok(n) => n,
                     Err(e) => {
@@ -104,13 +102,11 @@ pub async fn start_tcp_proxy(config: &Config, targets: Arc<Mutex<HashMap<String,
                         return;
                     }
                 };
-                println!("bbb: read {}", n);
 
-                if let Err(e) = accept_connection_t2.lock().await.connection.tcp_stream.write_all(&buf[0..n]).await {
+                if let Err(e) = accept_connection_write.lock().await.write_all(&buf[0..n]).await {
                     eprintln!("failed to write to socket; err = {:?}", e);
                     return;
                 }
-                println!("bbb: write");
             }
         });
     }
