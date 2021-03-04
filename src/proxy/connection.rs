@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use tokio::net::TcpStream;
+use tokio;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 
 use crate::proxy::proxy::{ProxyServer};
@@ -9,8 +8,8 @@ use crate::proxy::proxy::{ProxyServer};
 
 #[derive(Debug)]
 pub struct Connection {
-    pub tcp_stream_read: Arc<Mutex<OwnedReadHalf>>,
-    pub tcp_stream_write: Arc<Mutex<OwnedWriteHalf>>,
+    pub tcp_stream_read: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
+    pub tcp_stream_write: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
     pub start_time_1m: i64,
     pub start_time_5m: i64,
     pub start_time_30m: i64,
@@ -23,7 +22,8 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(tcp_stream_read: Arc<Mutex<OwnedReadHalf>>, tcp_stream_write: Arc<Mutex<OwnedWriteHalf>>) -> Connection {
+    pub fn new(tcp_stream_read: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
+               tcp_stream_write: Arc<tokio::sync::Mutex<OwnedWriteHalf>>) -> Connection {
         Connection {
             tcp_stream_read,
             tcp_stream_write,
@@ -46,7 +46,8 @@ pub struct NodeConnection {
 }
 
 impl NodeConnection {
-    pub fn new(tcp_stream_read: Arc<Mutex<OwnedReadHalf>>, tcp_stream_write: Arc<Mutex<OwnedWriteHalf>>) -> NodeConnection {
+    pub fn new(tcp_stream_read: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
+               tcp_stream_write: Arc<tokio::sync::Mutex<OwnedWriteHalf>>) -> NodeConnection {
         NodeConnection {
             connection: Connection::new(tcp_stream_read, tcp_stream_write),
         }
@@ -60,7 +61,9 @@ pub struct TargetConnection {
 }
 
 impl TargetConnection {
-    pub fn new(tcp_stream_read: Arc<Mutex<OwnedReadHalf>>, tcp_stream_write: Arc<Mutex<OwnedWriteHalf>>, target_id: String) -> TargetConnection {
+    pub fn new(tcp_stream_read: Arc<tokio::sync::Mutex<OwnedReadHalf>>,
+               tcp_stream_write: Arc<tokio::sync::Mutex<OwnedWriteHalf>>,
+               target_id: String) -> TargetConnection {
         TargetConnection {
             connection: Connection::new(tcp_stream_read, tcp_stream_write),
             target_id,

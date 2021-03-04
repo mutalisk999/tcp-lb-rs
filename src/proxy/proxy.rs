@@ -1,15 +1,14 @@
-use tokio::net::{TcpListener, TcpSocket, TcpStream};
+use tokio;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use std::error::Error;
 
-use crate::proxy::config::Config;
 use std::collections::HashMap;
-use tokio::sync::Mutex;
 use std::sync::Arc;
 use tokio::time::Duration;
 use std::borrow::{BorrowMut, Borrow};
 use tokio::net::tcp::{ReadHalf, WriteHalf};
 
+use crate::proxy::config::Config;
 use crate::proxy::connection::{NodeConnection, TargetConnection};
 use crate::proxy::target::{Target, dump_targets};
 use crate::proxy::config::{read_config};
@@ -18,16 +17,16 @@ use crate::proxy::config::{read_config};
 #[derive(Debug)]
 pub struct ProxyServer {
     pub server_config: Config,
-    pub targets_info: Arc<Mutex<HashMap<String, Target>>>,
-    pub connections_info: Arc<Mutex<Vec<(NodeConnection, TargetConnection)>>>,
+    pub targets_info: Arc<tokio::sync::Mutex<HashMap<String, Target>>>,
+    pub connections_info: Arc<tokio::sync::Mutex<Vec<(NodeConnection, TargetConnection)>>>,
 }
 
 impl ProxyServer {
     pub fn new() -> ProxyServer{
         ProxyServer {
             server_config: read_config(),
-            targets_info: Arc::new(Mutex::new(HashMap::new())),
-            connections_info: Arc::new(Mutex::new(Vec::new())),
+            targets_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            connections_info: Arc::new(tokio::sync::Mutex::new(Vec::new())),
         }
     }
 }
@@ -36,7 +35,7 @@ impl ProxyServer {
 pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
     ) -> Result<(), Box<dyn Error>>{
 
-    let node_listener = TcpListener::bind(proxy_server.server_config.lb_node.listen.as_str())
+    let node_listener = tokio::net::TcpListener::bind(proxy_server.server_config.lb_node.listen.as_str())
         .await.expect(format!("Failure binding node listen endpoint [{}]", proxy_server.server_config.lb_node.listen).as_str());
 
     loop {
@@ -44,8 +43,8 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         println!("remote connection from {}", remote_addr);
 
         let targets_dump = dump_targets(proxy_server).await;
-        let mut socket_conn: Option<TcpSocket> = None;
-        let mut tcp_stream_conn: Option<TcpStream> = None;
+        let mut socket_conn: Option<tokio::net::TcpSocket> = None;
+        let mut tcp_stream_conn: Option<tokio::net::TcpStream> = None;
         let mut conn_target_id: Option<String> = None;
         let mut target_time_out: Option<u32> = None;
 
@@ -57,7 +56,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                 continue;
             }
 
-            let r = TcpSocket::new_v4();
+            let r = tokio::net::TcpSocket::new_v4();
             socket_conn = match r {
                 Ok(s) => Some(s),
                 Err(_) => continue
@@ -86,10 +85,10 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         let (mut tcp_stream_accept_read, mut tcp_stream_accept_write) = tcp_stream_accept.into_split();
         let (mut tcp_stream_conn_read, mut tcp_stream_conn_write) = tcp_stream_conn.into_split();
 
-        let accept_connection_read = Arc::new(Mutex::new(tcp_stream_accept_read));
-        let accept_connection_write = Arc::new(Mutex::new(tcp_stream_accept_write));
-        let conn_connection_read  = Arc::new(Mutex::new(tcp_stream_conn_read));
-        let conn_connection_write  = Arc::new(Mutex::new(tcp_stream_conn_write));
+        let accept_connection_read = Arc::new(tokio::sync::Mutex::new(tcp_stream_accept_read));
+        let accept_connection_write = Arc::new(tokio::sync::Mutex::new(tcp_stream_accept_write));
+        let conn_connection_read  = Arc::new(tokio::sync::Mutex::new(tcp_stream_conn_read));
+        let conn_connection_write  = Arc::new(tokio::sync::Mutex::new(tcp_stream_conn_write));
 
         tokio::spawn(async move {
             let mut buf = [0; 1024];

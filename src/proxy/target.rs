@@ -1,8 +1,9 @@
-
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio;
 use std::collections::HashMap;
 use std::error::Error;
+use md5;
+
 use crate::proxy::config::Config;
 use crate::proxy::connection::{get_target_conn_count_by_target_id, TargetConnection, NodeConnection};
 use crate::proxy::proxy::{ProxyServer};
@@ -40,7 +41,8 @@ pub async fn init_targets_from_config(proxy_server: &mut ProxyServer) {
             target_config.target_timeout,
             target_config.target_active, true);
 
-        proxy_server.targets_info.lock().await.insert(target.target_endpoint.clone(),target);
+        let digest = md5::compute(target.target_endpoint.as_str());
+        proxy_server.targets_info.lock().await.insert(format!("{:x}",digest).to_string(),target);
     }
 }
 
@@ -58,7 +60,6 @@ impl TargetDump {
         }
     }
 }
-
 
 pub async fn dump_targets(proxy_server: &ProxyServer) -> Vec<TargetDump> {
     let mut target_dump_vec = Vec::<TargetDump>::new();

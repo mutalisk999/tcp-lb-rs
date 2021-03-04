@@ -1,5 +1,4 @@
-extern crate tokio;
-
+use tokio;
 use tokio::sync::Mutex;
 use std::collections::HashMap;
 
