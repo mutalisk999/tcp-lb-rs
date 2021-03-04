@@ -9,6 +9,13 @@ use crate::proxy::connection::{get_target_conn_count_by_target_id, TargetConnect
 use crate::proxy::proxy::{ProxyServer};
 
 #[derive(Debug, Clone)]
+pub enum TargetDumpOrder {
+    NoOrder,
+    AscOrder,
+    DescOrder,
+}
+
+#[derive(Debug, Clone)]
 pub struct Target {
     pub target_endpoint: String,
     pub target_active: bool,
@@ -61,7 +68,7 @@ impl TargetDump {
     }
 }
 
-pub async fn dump_targets(proxy_server: &ProxyServer) -> Vec<TargetDump> {
+pub async fn dump_targets(proxy_server: &ProxyServer, order: TargetDumpOrder) -> Vec<TargetDump> {
     let mut target_dump_vec = Vec::<TargetDump>::new();
     for (_, v) in proxy_server.targets_info.lock().await.iter(){
         let target_conn_count = get_target_conn_count_by_target_id(v.target_endpoint.clone(), proxy_server).await;
@@ -69,6 +76,10 @@ pub async fn dump_targets(proxy_server: &ProxyServer) -> Vec<TargetDump> {
                                            v.target_timeout, v.target_active, v.target_status);
         target_dump_vec.push(target_dump);
     }
-    target_dump_vec.sort_by(|l,r| l.target_conn_count.cmp(&r.target_conn_count));
+    match order {
+        TargetDumpOrder::AscOrder => target_dump_vec.sort_by(|l, r| l.target_conn_count.cmp(&r.target_conn_count)),
+        TargetDumpOrder::DescOrder => target_dump_vec.sort_by(|l, r| r.target_conn_count.cmp(&l.target_conn_count)),
+        TargetDumpOrder::NoOrder => {}
+    };
     target_dump_vec
 }

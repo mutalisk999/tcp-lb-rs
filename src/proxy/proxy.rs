@@ -10,7 +10,7 @@ use tokio::net::tcp::{ReadHalf, WriteHalf};
 
 use crate::proxy::config::Config;
 use crate::proxy::connection::{NodeConnection, TargetConnection};
-use crate::proxy::target::{Target, dump_targets};
+use crate::proxy::target::{Target, TargetDumpOrder, dump_targets};
 use crate::proxy::config::{read_config};
 
 
@@ -42,7 +42,8 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         let (mut tcp_stream_accept, remote_addr) = node_listener.accept().await?;
         println!("remote connection from {}", remote_addr);
 
-        let targets_dump = dump_targets(proxy_server).await;
+        let targets_dump = dump_targets(proxy_server, TargetDumpOrder::AscOrder).await;
+
         let mut socket_conn: Option<tokio::net::TcpSocket> = None;
         let mut tcp_stream_conn: Option<tokio::net::TcpStream> = None;
         let mut conn_target_id: Option<String> = None;
