@@ -1,18 +1,14 @@
 use tokio;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::error::Error;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::time::Duration;
-use std::borrow::{BorrowMut, Borrow};
-use tokio::net::tcp::{ReadHalf, WriteHalf};
 
 use crate::proxy::config::Config;
 use crate::proxy::connection::{NodeConnection, TargetConnection, new_connection_id};
 use crate::proxy::target::{Target, TargetDumpOrder, calc_target_id_by_endpoint, dump_targets};
 use crate::proxy::config::{read_config};
-use std::ops::Deref;
 
 
 #[derive(Debug)]
@@ -44,7 +40,6 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
 
         let targets_dump = dump_targets(proxy_server, TargetDumpOrder::AscOrder).await;
 
-        let mut socket_conn: Option<tokio::net::TcpSocket> = None;
         let mut tcp_stream_target: Option<tokio::net::TcpStream> = None;
         let mut conn_target_info: Option<Target> = None;
 
@@ -57,7 +52,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
             }
 
             let r = tokio::net::TcpSocket::new_v4();
-            socket_conn = match r {
+            let socket_conn = match r {
                 Ok(s) => Some(s),
                 Err(_) => continue
             };
@@ -79,7 +74,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
             }
         }
         let conn_target_id = calc_target_id_by_endpoint(conn_target_info.clone().unwrap().target_endpoint);
-        let mut tcp_stream_target = tcp_stream_target.unwrap();
+        let tcp_stream_target = tcp_stream_target.unwrap();
         let target_local_addr = tcp_stream_target.local_addr().unwrap().to_string();
 
         let (mut tcp_stream_node_read, mut tcp_stream_node_write) = tcp_stream_node.into_split();
@@ -96,9 +91,9 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         );
 
         let proxy_connection_id = new_connection_id();
-        let mut connection_info_arc = proxy_server.connections_info.clone();
+        let connection_info_arc = proxy_server.connections_info.clone();
         let proxy_connection_id_dump = proxy_connection_id.clone();
-        let mut connection_info_arc_dump = connection_info_arc.clone();
+        let connection_info_arc_dump = connection_info_arc.clone();
 
         let mut connection_info = proxy_server.connections_info.lock().await.clone();
         connection_info.insert(proxy_connection_id.clone(), (node_connection_info, target_connection_info));
@@ -119,13 +114,13 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                             match v {
                                 Some((node_info, target_info)) => {
                                     let mut node_info_dump = node_info.clone();
-                                    let mut target_info_dump = target_info.clone();
+                                    let target_info_dump = target_info.clone();
                                     node_info_dump.connection.read_bytes_1m += n as u64;
                                     node_info_dump.connection.read_bytes_5m += n as u64;
                                     node_info_dump.connection.read_bytes_30m += n as u64;
                                     connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
                                 },
-                                None => {}
+                                None => (),
                             }
                         }
                         n
@@ -147,14 +142,14 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                         let v = node_info.get(&proxy_connection_id);
                         match v {
                             Some((node_info, target_info)) => {
-                                let mut node_info_dump = node_info.clone();
+                                let node_info_dump = node_info.clone();
                                 let mut target_info_dump = target_info.clone();
                                 target_info_dump.connection.write_bytes_1m += n as u64;
                                 target_info_dump.connection.write_bytes_5m += n as u64;
                                 target_info_dump.connection.write_bytes_30m += n as u64;
                                 connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
                             },
-                            None => {}
+                            None => (),
                         }
                     }
                 }
@@ -176,14 +171,14 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                             let v = node_info.get(&proxy_connection_id_dump);
                             match v {
                                 Some((node_info, target_info)) => {
-                                    let mut node_info_dump = node_info.clone();
+                                    let node_info_dump = node_info.clone();
                                     let mut target_info_dump = target_info.clone();
                                     target_info_dump.connection.read_bytes_1m += n as u64;
                                     target_info_dump.connection.read_bytes_5m += n as u64;
                                     target_info_dump.connection.read_bytes_30m += n as u64;
                                     connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
                                 },
-                                None => {}
+                                None => (),
                             }
                         }
                         n
@@ -206,13 +201,13 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                         match v {
                             Some((node_info, target_info)) => {
                                 let mut node_info_dump = node_info.clone();
-                                let mut target_info_dump = target_info.clone();
+                                let target_info_dump = target_info.clone();
                                 node_info_dump.connection.write_bytes_1m += n as u64;
                                 node_info_dump.connection.write_bytes_5m += n as u64;
                                 node_info_dump.connection.write_bytes_30m += n as u64;
                                 connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
                             },
-                            None => {}
+                            None => (),
                         }
                     }
                 }

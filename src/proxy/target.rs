@@ -1,13 +1,9 @@
-use std::sync::Arc;
-use tokio;
-use std::collections::HashMap;
-use std::error::Error;
 use md5;
 
-use crate::proxy::config::Config;
-use crate::proxy::connection::{get_target_conn_count_by_target_id, TargetConnection, NodeConnection};
+use crate::proxy::connection::{get_target_conn_count_by_target_id};
 use crate::proxy::proxy::{ProxyServer};
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum TargetDumpOrder {
     NoOrder,
@@ -83,7 +79,7 @@ pub async fn dump_targets(proxy_server: &mut ProxyServer, order: TargetDumpOrder
     match order {
         TargetDumpOrder::AscOrder => target_dump_vec.sort_by(|l, r| l.target_conn_count.cmp(&r.target_conn_count)),
         TargetDumpOrder::DescOrder => target_dump_vec.sort_by(|l, r| r.target_conn_count.cmp(&l.target_conn_count)),
-        TargetDumpOrder::NoOrder => {}
+        TargetDumpOrder::NoOrder => (),
     };
     target_dump_vec
 }
