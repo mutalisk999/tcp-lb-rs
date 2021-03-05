@@ -100,20 +100,23 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
 
         let mut connection_info = proxy_server.connections_info.lock().await.clone();
         connection_info.insert(proxy_connection_id.clone(), (node_connection_info, target_connection_info));
-        let mut connection_info_dump = connection_info.clone();
+
+        let mut connection_info_arc = proxy_server.connections_info.clone();
+        let mut connection_info_arc_dump = connection_info_arc.clone();
 
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             loop {
                 let n = match tcp_stream_node_read.read(&mut buf).await {
                     Ok(n) if n == 0 => {
-                        connection_info.remove(&proxy_connection_id);
+                        connection_info_arc.lock().await.remove(&proxy_connection_id);
                         eprintln!("|{}| tcp_stream_node_read closed by remote", proxy_connection_id);
                         return;
                     },
                     Ok(n) => {
                         {
-                            let v = connection_info.get(&proxy_connection_id);
+                            let node_info = connection_info_arc.lock().await;
+                            let v = node_info.get(&proxy_connection_id);
                             match v {
                                 Some((node_info, target_info)) => {
                                     let mut node_info_dump = node_info.clone();
@@ -121,7 +124,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                     node_info_dump.connection.read_bytes_1m += n as u64;
                                     node_info_dump.connection.read_bytes_5m += n as u64;
                                     node_info_dump.connection.read_bytes_30m += n as u64;
-                                    connection_info.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
+                                    connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
                                 },
                                 None => {}
                             }
@@ -129,19 +132,20 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                         n
                     },
                     Err(e) => {
-                        connection_info.remove(&proxy_connection_id.clone());
+                        connection_info_arc.lock().await.remove(&proxy_connection_id.clone());
                         eprintln!("|{}| failed to read from socket; err = {:?}", proxy_connection_id, e);
                         return;
                     }
                 };
 
                 if let Err(e) = tcp_stream_target_write.write_all(&buf[0..n]).await {
-                    connection_info.remove(&proxy_connection_id);
+                    connection_info_arc.lock().await.remove(&proxy_connection_id);
                     eprintln!("|{}| failed to write to socket; err = {:?}", proxy_connection_id, e);
                     return;
                 } else {
                     {
-                        let v = connection_info.get(&proxy_connection_id);
+                        let node_info = connection_info_arc.lock().await;
+                        let v = node_info.get(&proxy_connection_id);
                         match v {
                             Some((node_info, target_info)) => {
                                 let mut node_info_dump = node_info.clone();
@@ -149,7 +153,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                 target_info_dump.connection.write_bytes_1m += n as u64;
                                 target_info_dump.connection.write_bytes_5m += n as u64;
                                 target_info_dump.connection.write_bytes_30m += n as u64;
-                                connection_info.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
+                                connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
                             },
                             None => {}
                         }
@@ -163,13 +167,14 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
             loop {
                 let n = match tcp_stream_target_read.read(&mut buf).await {
                     Ok(n) if n == 0 => {
-                        connection_info_dump.remove(&proxy_connection_id_dump);
+                        connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
                         eprintln!("|{}| tcp_stream_target_read closed by remote", proxy_connection_id_dump);
                         return
                     },
                     Ok(n) => {
                         {
-                            let v = connection_info_dump.get(&proxy_connection_id_dump);
+                            let node_info = connection_info_arc_dump.lock().await;
+                            let v = node_info.get(&proxy_connection_id_dump);
                             match v {
                                 Some((node_info, target_info)) => {
                                     let mut node_info_dump = node_info.clone();
@@ -177,7 +182,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                     target_info_dump.connection.read_bytes_1m += n as u64;
                                     target_info_dump.connection.read_bytes_5m += n as u64;
                                     target_info_dump.connection.read_bytes_30m += n as u64;
-                                    connection_info_dump.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
+                                    connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
                                 },
                                 None => {}
                             }
@@ -185,19 +190,20 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                         n
                     },
                     Err(e) => {
-                        connection_info_dump.remove(&proxy_connection_id_dump);
+                        connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
                         eprintln!("|{}| failed to read from socket; err = {:?}", proxy_connection_id_dump, e);
                         return;
                     }
                 };
 
                 if let Err(e) = tcp_stream_node_write.write_all(&buf[0..n]).await {
-                    connection_info_dump.remove(&proxy_connection_id_dump);
+                    connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
                     eprintln!("|{}| failed to write to socket; err = {:?}", proxy_connection_id_dump, e);
                     return;
                 } else {
                     {
-                        let v = connection_info_dump.get(&proxy_connection_id_dump);
+                        let node_info = connection_info_arc_dump.lock().await;
+                        let v = node_info.get(&proxy_connection_id_dump);
                         match v {
                             Some((node_info, target_info)) => {
                                 let mut node_info_dump = node_info.clone();
@@ -205,7 +211,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                 node_info_dump.connection.write_bytes_1m += n as u64;
                                 node_info_dump.connection.write_bytes_5m += n as u64;
                                 node_info_dump.connection.write_bytes_30m += n as u64;
-                                connection_info_dump.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
+                                connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
                             },
                             None => {}
                         }
