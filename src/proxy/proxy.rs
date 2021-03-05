@@ -85,9 +85,6 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         let (mut tcp_stream_node_read, mut tcp_stream_node_write) = tcp_stream_node.into_split();
         let (mut tcp_stream_target_read, mut tcp_stream_target_write) = tcp_stream_target.into_split();
 
-        let proxy_connection_id = new_connection_id();
-        let proxy_connection_id_dump = proxy_connection_id.clone();
-
         let node_connection_info = NodeConnection::new(
             proxy_server.server_config.lb_node.listen.clone(),
             node_remote_addr.to_string());
@@ -98,11 +95,13 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
             conn_target_id
         );
 
+        let proxy_connection_id = new_connection_id();
+        let mut connection_info_arc = proxy_server.connections_info.clone();
+        let proxy_connection_id_dump = proxy_connection_id.clone();
+        let mut connection_info_arc_dump = connection_info_arc.clone();
+
         let mut connection_info = proxy_server.connections_info.lock().await.clone();
         connection_info.insert(proxy_connection_id.clone(), (node_connection_info, target_connection_info));
-
-        let mut connection_info_arc = proxy_server.connections_info.clone();
-        let mut connection_info_arc_dump = connection_info_arc.clone();
 
         tokio::spawn(async move {
             let mut buf = [0; 1024];
