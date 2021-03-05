@@ -10,7 +10,7 @@ use tokio::net::tcp::{ReadHalf, WriteHalf};
 
 use crate::proxy::config::Config;
 use crate::proxy::connection::{NodeConnection, TargetConnection};
-use crate::proxy::target::{Target, TargetDumpOrder, dump_targets};
+use crate::proxy::target::{Target, TargetDumpOrder, calc_target_id_by_endpoint, dump_targets};
 use crate::proxy::config::{read_config};
 
 
@@ -46,8 +46,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
 
         let mut socket_conn: Option<tokio::net::TcpSocket> = None;
         let mut tcp_stream_conn: Option<tokio::net::TcpStream> = None;
-        let mut conn_target_id: Option<String> = None;
-        let mut target_time_out: Option<u32> = None;
+        let mut conn_target_info: Option<Target> = None;
 
         for t in targets_dump.iter() {
             if !t.target.target_active {
@@ -68,8 +67,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                 Err(_) => continue
             };
 
-            conn_target_id = Some(t.target.target_endpoint.clone());
-            target_time_out = Some(t.target.target_timeout);
+            conn_target_info = Some(t.target.clone());
             break;
         }
 
@@ -80,21 +78,16 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                 continue;
             }
         }
-        let conn_target_id = conn_target_id.unwrap();
+        let conn_target_id = calc_target_id_by_endpoint(conn_target_info.unwrap().target_endpoint);
         let mut tcp_stream_conn = tcp_stream_conn.unwrap();
 
         let (mut tcp_stream_accept_read, mut tcp_stream_accept_write) = tcp_stream_accept.into_split();
         let (mut tcp_stream_conn_read, mut tcp_stream_conn_write) = tcp_stream_conn.into_split();
 
-        let accept_connection_read = Arc::new(tokio::sync::Mutex::new(tcp_stream_accept_read));
-        let accept_connection_write = Arc::new(tokio::sync::Mutex::new(tcp_stream_accept_write));
-        let conn_connection_read  = Arc::new(tokio::sync::Mutex::new(tcp_stream_conn_read));
-        let conn_connection_write  = Arc::new(tokio::sync::Mutex::new(tcp_stream_conn_write));
-
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             loop {
-                let n = match accept_connection_read.lock().await.read(&mut buf).await {
+                let n = match tcp_stream_accept_read.read(&mut buf).await {
                     Ok(n) if n == 0 => return,
                     Ok(n) => n,
                     Err(e) => {
@@ -103,7 +96,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                     }
                 };
 
-                if let Err(e) = conn_connection_write.lock().await.write_all(&buf[0..n]).await {
+                if let Err(e) = tcp_stream_conn_write.write_all(&buf[0..n]).await {
                     eprintln!("failed to write to socket; err = {:?}", e);
                     return;
                 }
@@ -113,7 +106,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             loop {
-                let n = match conn_connection_read.lock().await.read(&mut buf).await {
+                let n = match tcp_stream_conn_read.read(&mut buf).await {
                     Ok(n) if n == 0 => return,
                     Ok(n) => n,
                     Err(e) => {
@@ -122,7 +115,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                     }
                 };
 
-                if let Err(e) = accept_connection_write.lock().await.write_all(&buf[0..n]).await {
+                if let Err(e) = tcp_stream_accept_write.write_all(&buf[0..n]).await {
                     eprintln!("failed to write to socket; err = {:?}", e);
                     return;
                 }

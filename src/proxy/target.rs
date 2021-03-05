@@ -40,6 +40,11 @@ impl Target {
     }
 }
 
+pub fn calc_target_id_by_endpoint(endpoint: String) -> String {
+    let digest = md5::compute(endpoint.as_str());
+    format!("{:x}",digest).to_string()
+}
+
 pub async fn init_targets_from_config(proxy_server: &mut ProxyServer) {
     for target_config in proxy_server.server_config.lb_targets.iter() {
         let target= Target::new(
@@ -48,8 +53,7 @@ pub async fn init_targets_from_config(proxy_server: &mut ProxyServer) {
             target_config.target_timeout,
             target_config.target_active, true);
 
-        let digest = md5::compute(target.target_endpoint.as_str());
-        proxy_server.targets_info.lock().await.insert(format!("{:x}",digest).to_string(),target);
+        proxy_server.targets_info.lock().await.insert(calc_target_id_by_endpoint(target.clone().target_endpoint),target);
     }
 }
 
