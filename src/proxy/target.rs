@@ -72,7 +72,7 @@ impl TargetDump {
     }
 }
 
-pub async fn dump_targets(proxy_server: &ProxyServer, order: TargetDumpOrder) -> Vec<TargetDump> {
+pub async fn dump_targets(proxy_server: &mut ProxyServer, order: TargetDumpOrder) -> Vec<TargetDump> {
     let mut target_dump_vec = Vec::<TargetDump>::new();
     for (_, v) in proxy_server.targets_info.lock().await.iter(){
         let target_conn_count = get_target_conn_count_by_target_id(v.target_endpoint.clone(), proxy_server).await;
@@ -86,4 +86,10 @@ pub async fn dump_targets(proxy_server: &ProxyServer, order: TargetDumpOrder) ->
         TargetDumpOrder::NoOrder => {}
     };
     target_dump_vec
+}
+
+#[test]
+fn test_calc_target_id() {
+    let target_id = calc_target_id_by_endpoint("127.0.0.1:1080".to_string());
+    println!("target_id: {:?}", target_id);
 }
