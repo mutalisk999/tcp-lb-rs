@@ -82,7 +82,7 @@ pub fn new_connection_id() -> String {
 
 #[test]
 fn test_new_connection_id() {
-    for _ in (0..10) {
+    for _ in 0..10 {
         let conn_id = new_connection_id();
         println!("connection_id: {:?}", conn_id);
     }
