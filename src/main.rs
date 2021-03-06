@@ -10,7 +10,7 @@ async fn run(proxy_server: &mut ProxyServer) {
 
     // init targets
     init_targets_from_config(proxy_server).await;
-    println!("init targets count: {}", proxy_server.targets_info.lock().await.len());
+    println!("targets init, count: {}", proxy_server.targets_info.lock().await.len());
 
     let fut_tcp_proxy = start_tcp_proxy(proxy_server);
 

@@ -36,6 +36,18 @@ impl Connection {
             write_bytes_30m: 0,
         }
     }
+
+    pub fn add_read_n(&mut self, read_n: u64) {
+        self.read_bytes_1m += read_n;
+        self.read_bytes_5m += read_n;
+        self.read_bytes_30m += read_n;
+    }
+
+    pub fn add_write_n(&mut self, write_n: u64) {
+        self.write_bytes_1m += write_n;
+        self.write_bytes_5m += write_n;
+        self.write_bytes_30m += write_n;
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +60,14 @@ impl NodeConnection {
         NodeConnection {
             connection: Connection::new(local_endpoint, remote_endpoint),
         }
+    }
+
+    pub fn add_read_n(&mut self, read_n: u64) {
+        self.connection.add_read_n(read_n);
+    }
+
+    pub fn add_write_n(&mut self, write_n: u64) {
+        self.connection.add_write_n(write_n);
     }
 }
 
@@ -62,6 +82,14 @@ impl TargetConnection {
         TargetConnection {
             connection: Connection::new(local_endpoint, remote_endpoint), target_id,
         }
+    }
+
+    pub fn add_read_n(&mut self, read_n: u64) {
+        self.connection.add_read_n(read_n);
+    }
+
+    pub fn add_write_n(&mut self, write_n: u64) {
+        self.connection.add_write_n(write_n);
     }
 }
 

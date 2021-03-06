@@ -37,19 +37,24 @@ pub struct TargetConfig {
 
 impl Config {
     pub fn check(&self) -> Result<(), Box<dyn Error>> {
-        let _ : SocketAddr = self.lb_node.listen.parse().expect(&*format!("Invalid node endpoint [{}]", self.lb_node.listen));
+        let _ : SocketAddr = self.lb_node.listen.parse()
+            .expect(&*format!("Invalid node endpoint [{}]", self.lb_node.listen));
         for t in self.lb_targets.iter() {
-            let _ : SocketAddr = t.target_endpoint.parse().expect(&*format!("Invalid target endpoint [{}]", t.target_endpoint));
+            let _ : SocketAddr = t.target_endpoint.parse()
+                .expect(&*format!("Invalid target endpoint [{}]", t.target_endpoint));
         }
         Ok(())
     }
 }
 
 pub fn read_config() -> Config {
-    let mut config_file = File::open(CONFIG_FILE_NAME).expect("Config file not found");
+    let mut config_file = File::open(CONFIG_FILE_NAME)
+        .expect(&*format!("Config file [{}] not found", CONFIG_FILE_NAME));
     let mut json_str = String::new();
-    config_file.read_to_string(&mut json_str).expect("Failure while reading config file");
-    let config: Config = serde_json::from_str(&json_str).expect("Failure while deserializing json config");
+    config_file.read_to_string(&mut json_str)
+        .expect("Failure while reading config file to string");
+    let config: Config = serde_json::from_str(&json_str)
+        .expect("Failure while deserializing json config");
     config
 }
 

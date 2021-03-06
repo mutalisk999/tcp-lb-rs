@@ -43,6 +43,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         let mut tcp_stream_target: Option<tokio::net::TcpStream> = None;
         let mut conn_target_info: Option<Target> = None;
 
+        // try to connect from the least connection of the target
         for t in targets_dump.iter() {
             if !t.target.target_active {
                 continue;
@@ -98,6 +99,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         let mut connection_info = proxy_server.connections_info.lock().await.clone();
         connection_info.insert(proxy_connection_id.clone(), (node_connection_info, target_connection_info));
 
+        // task of bytes reading from node connection or writing to target connection
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             loop {
@@ -115,9 +117,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                 Some((node_info, target_info)) => {
                                     let mut node_info_dump = node_info.clone();
                                     let target_info_dump = target_info.clone();
-                                    node_info_dump.connection.read_bytes_1m += n as u64;
-                                    node_info_dump.connection.read_bytes_5m += n as u64;
-                                    node_info_dump.connection.read_bytes_30m += n as u64;
+                                    node_info_dump.add_read_n(n as u64);
                                     connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
                                 },
                                 None => (),
@@ -127,14 +127,14 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                     },
                     Err(e) => {
                         connection_info_arc.lock().await.remove(&proxy_connection_id.clone());
-                        eprintln!("|{}| failed to read from socket; err = {:?}", proxy_connection_id, e);
+                        eprintln!("|{}| tcp_stream_node_read failed to read from socket; err = {:?}", proxy_connection_id, e);
                         return;
                     }
                 };
 
                 if let Err(e) = tcp_stream_target_write.write_all(&buf[0..n]).await {
                     connection_info_arc.lock().await.remove(&proxy_connection_id);
-                    eprintln!("|{}| failed to write to socket; err = {:?}", proxy_connection_id, e);
+                    eprintln!("|{}| tcp_stream_target_write failed to write to socket; err = {:?}", proxy_connection_id, e);
                     return;
                 } else {
                     {
@@ -144,9 +144,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                             Some((node_info, target_info)) => {
                                 let node_info_dump = node_info.clone();
                                 let mut target_info_dump = target_info.clone();
-                                target_info_dump.connection.write_bytes_1m += n as u64;
-                                target_info_dump.connection.write_bytes_5m += n as u64;
-                                target_info_dump.connection.write_bytes_30m += n as u64;
+                                target_info_dump.add_write_n(n as u64);
                                 connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
                             },
                             None => (),
@@ -156,6 +154,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
             }
         });
 
+        // task of bytes reading from target connection or writing to node connection
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             loop {
@@ -173,9 +172,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                 Some((node_info, target_info)) => {
                                     let node_info_dump = node_info.clone();
                                     let mut target_info_dump = target_info.clone();
-                                    target_info_dump.connection.read_bytes_1m += n as u64;
-                                    target_info_dump.connection.read_bytes_5m += n as u64;
-                                    target_info_dump.connection.read_bytes_30m += n as u64;
+                                    target_info_dump.add_read_n(n as u64);
                                     connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
                                 },
                                 None => (),
@@ -185,14 +182,14 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                     },
                     Err(e) => {
                         connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                        eprintln!("|{}| failed to read from socket; err = {:?}", proxy_connection_id_dump, e);
+                        eprintln!("|{}| tcp_stream_target_read failed to read from socket; err = {:?}", proxy_connection_id_dump, e);
                         return;
                     }
                 };
 
                 if let Err(e) = tcp_stream_node_write.write_all(&buf[0..n]).await {
                     connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                    eprintln!("|{}| failed to write to socket; err = {:?}", proxy_connection_id_dump, e);
+                    eprintln!("|{}| tcp_stream_node_write failed to write to socket; err = {:?}", proxy_connection_id_dump, e);
                     return;
                 } else {
                     {
@@ -202,9 +199,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                             Some((node_info, target_info)) => {
                                 let mut node_info_dump = node_info.clone();
                                 let target_info_dump = target_info.clone();
-                                node_info_dump.connection.write_bytes_1m += n as u64;
-                                node_info_dump.connection.write_bytes_5m += n as u64;
-                                node_info_dump.connection.write_bytes_30m += n as u64;
+                                node_info_dump.add_write_n(n as u64);
                                 connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
                             },
                             None => (),
