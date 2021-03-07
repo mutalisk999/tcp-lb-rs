@@ -122,7 +122,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                     match r {
                         Ok(n) if n == 0 => {
                             connection_info_arc.lock().await.remove(&proxy_connection_id);
-                            eprintln!("|{}| tcp_stream_node_read closed by remote", proxy_connection_id);
+                            eprintln!("|{}| tcp_stream_node_read: closed by remote", proxy_connection_id);
                             return;
                         },
                         Ok(n) => {
@@ -137,20 +137,24 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                         node_info_dump.add_read_n(n as u64);
                                         connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
                                     },
-                                    None => (),
+                                    None => {
+                                        connection_info_arc.lock().await.remove(&proxy_connection_id);
+                                        eprintln!("|{}| tcp_stream_node_read: not find, disconnect", proxy_connection_id);
+                                        return;
+                                    },
                                 }
                             }
                         },
                         Err(e) => {
                             connection_info_arc.lock().await.remove(&proxy_connection_id.clone());
-                            eprintln!("|{}| tcp_stream_node_read failed to read from socket; err = {:?}", proxy_connection_id, e);
+                            eprintln!("|{}| tcp_stream_node_read: failed to read from socket; err = {:?}", proxy_connection_id, e);
                             return;
                         }
                     };
                 } else {
                     // read from node timeout
                     connection_info_arc.lock().await.remove(&proxy_connection_id);
-                    eprintln!("|{}| tcp_stream_node_read timeout", proxy_connection_id);
+                    eprintln!("|{}| tcp_stream_node_read: timeout", proxy_connection_id);
                     return;
                 }
 
@@ -167,19 +171,23 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                     target_info_dump.add_write_n(count as u64);
                                     connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
                                 },
-                                None => (),
+                                None => {
+                                    connection_info_arc.lock().await.remove(&proxy_connection_id);
+                                    eprintln!("|{}| tcp_stream_target_write: not find, disconnect", proxy_connection_id);
+                                    return;
+                                },
                             }
                         }
                         Err(e) => {
                             connection_info_arc.lock().await.remove(&proxy_connection_id);
-                            eprintln!("|{}| tcp_stream_target_write failed to write to socket; err = {:?}", proxy_connection_id, e);
+                            eprintln!("|{}| tcp_stream_target_write: failed to write to socket; err = {:?}", proxy_connection_id, e);
                             return;
                         }
                     }
                 } else {
                     // write to target timeout
                     connection_info_arc.lock().await.remove(&proxy_connection_id);
-                    eprintln!("|{}| tcp_stream_target_write timeout", proxy_connection_id);
+                    eprintln!("|{}| tcp_stream_target_write: timeout", proxy_connection_id);
                     return;
                 }
             }
@@ -195,7 +203,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                     match r {
                         Ok(n) if n == 0 => {
                             connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                            eprintln!("|{}| tcp_stream_target_read closed by remote", proxy_connection_id_dump);
+                            eprintln!("|{}| tcp_stream_target_read: closed by remote", proxy_connection_id_dump);
                             return
                         },
                         Ok(n) => {
@@ -210,20 +218,24 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                         target_info_dump.add_read_n(n as u64);
                                         connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
                                     },
-                                    None => (),
+                                    None => {
+                                        connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
+                                        eprintln!("|{}| tcp_stream_target_read: not find, disconnect", proxy_connection_id_dump);
+                                        return
+                                    },
                                 }
                             }
                         },
                         Err(e) => {
                             connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                            eprintln!("|{}| tcp_stream_target_read failed to read from socket; err = {:?}", proxy_connection_id_dump, e);
+                            eprintln!("|{}| tcp_stream_target_read: failed to read from socket; err = {:?}", proxy_connection_id_dump, e);
                             return;
                         }
                     };
                 } else {
                     // read from target timeout
                     connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                    eprintln!("|{}| tcp_stream_target_read timeout", proxy_connection_id_dump);
+                    eprintln!("|{}| tcp_stream_target_read: timeout", proxy_connection_id_dump);
                     return;
                 }
 
@@ -241,20 +253,24 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                                         node_info_dump.add_write_n(count as u64);
                                         connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
                                     },
-                                    None => (),
+                                    None => {
+                                        connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
+                                        eprintln!("|{}| tcp_stream_node_write: not find, disconnect", proxy_connection_id_dump);
+                                        return;
+                                    },
                                 }
                             }
                         }
                         Err(e) => {
                             connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                            eprintln!("|{}| tcp_stream_node_write failed to write to socket; err = {:?}", proxy_connection_id_dump, e);
+                            eprintln!("|{}| tcp_stream_node_write: failed to write to socket; err = {:?}", proxy_connection_id_dump, e);
                             return;
                         }
                     }
                 } else {
                     // write to node timeout
                     connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                    eprintln!("|{}| tcp_stream_node_write timeout", proxy_connection_id_dump);
+                    eprintln!("|{}| tcp_stream_node_write: timeout", proxy_connection_id_dump);
                     return;
                 }
             }
