@@ -38,15 +38,15 @@ impl Connection {
     }
 
     pub fn add_read_n(&mut self, read_n: u64) {
-        self.read_bytes_1m += read_n;
-        self.read_bytes_5m += read_n;
-        self.read_bytes_30m += read_n;
+        self.read_bytes_1m += read_n.clone();
+        self.read_bytes_5m += read_n.clone();
+        self.read_bytes_30m += read_n.clone();
     }
 
     pub fn add_write_n(&mut self, write_n: u64) {
-        self.write_bytes_1m += write_n;
-        self.write_bytes_5m += write_n;
-        self.write_bytes_30m += write_n;
+        self.write_bytes_1m += write_n.clone();
+        self.write_bytes_5m += write_n.clone();
+        self.write_bytes_30m += write_n.clone();
     }
 }
 
