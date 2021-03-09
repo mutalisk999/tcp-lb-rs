@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::proxy::config::Config;
-use crate::proxy::connection::{NodeConnection, TargetConnection, new_connection_id};
+use crate::proxy::connection::{NodeConnection, TargetConnection, new_tunnel_id};
 use crate::proxy::target::{Target, TargetDumpOrder, calc_target_id_by_endpoint, dump_targets};
 use crate::proxy::config::{read_config};
 
@@ -15,7 +15,7 @@ use crate::proxy::config::{read_config};
 pub struct ProxyServer {
     pub server_config: Config,
     pub targets_info: Arc<tokio::sync::Mutex<HashMap<String, Target>>>,
-    pub connections_info: Arc<tokio::sync::Mutex<HashMap<String, (NodeConnection, TargetConnection)>>>,
+    pub tunnel_info: Arc<tokio::sync::Mutex<HashMap<String, (NodeConnection, TargetConnection)>>>,
 }
 
 impl ProxyServer {
@@ -23,7 +23,7 @@ impl ProxyServer {
         ProxyServer {
             server_config: read_config(),
             targets_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
-            connections_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            tunnel_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         }
     }
 }
@@ -98,21 +98,21 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
             conn_target_id
         );
 
-        let proxy_connection_id = new_connection_id();
-        let connection_info_arc = proxy_server.connections_info.clone();
-        let proxy_connection_id_dump = proxy_connection_id.clone();
-        let connection_info_arc_dump = connection_info_arc.clone();
+        let tunnel_id = new_tunnel_id();
+        let tunnel_info_arc = proxy_server.tunnel_info.clone();
+        let tunnel_id_dump = tunnel_id.clone();
+        let tunnel_info_arc_dump = tunnel_info_arc.clone();
 
-        let mut connection_info = proxy_server.connections_info.lock().await.clone();
-        connection_info.insert(proxy_connection_id.clone(), (node_connection_info, target_connection_info));
-        println!("success build connection pair |{}|, node: {}->{}, target: {}->{}",
-                 proxy_connection_id,
+        let mut connection_info = proxy_server.tunnel_info.lock().await.clone();
+        connection_info.insert(tunnel_id.clone(), (node_connection_info, target_connection_info));
+        println!("build tunnel |{}| successfully, node: {}->{}, target: {}->{}",
+                 tunnel_id,
                  node_remote_addr.to_string(),
                  proxy_server.server_config.lb_node.listen.clone(),
                  target_local_addr.clone(),
                  conn_target_info.clone().unwrap().target_endpoint);
 
-        // task of bytes reading from node connection or writing to target connection
+        // task of reading from node connection and then writing to target connection
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             let mut count;
@@ -121,40 +121,40 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                 if let Ok(r) = tokio::time::timeout(read_timeout, tcp_stream_node_read.read(&mut buf)).await {
                     match r {
                         Ok(n) if n == 0 => {
-                            connection_info_arc.lock().await.remove(&proxy_connection_id);
-                            eprintln!("|{}| tcp_stream_node_read: closed by remote", proxy_connection_id);
+                            tunnel_info_arc.lock().await.remove(&tunnel_id);
+                            eprintln!("|{}| tcp_stream_node_read: closed by remote", tunnel_id);
                             return;
                         },
                         Ok(n) => {
                             {
                                 count = n;
-                                let node_info = connection_info_arc.lock().await;
-                                let v = node_info.get(&proxy_connection_id);
+                                let node_info = tunnel_info_arc.lock().await;
+                                let v = node_info.get(&tunnel_id);
                                 match v {
                                     Some((node_info, target_info)) => {
                                         let mut node_info_dump = node_info.clone();
                                         let target_info_dump = target_info.clone();
                                         node_info_dump.add_read_n(n as u64);
-                                        connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
+                                        tunnel_info_arc.lock().await.insert(tunnel_id.clone(), (node_info_dump, target_info_dump));
                                     },
                                     None => {
-                                        connection_info_arc.lock().await.remove(&proxy_connection_id);
-                                        eprintln!("|{}| tcp_stream_node_read: not find, disconnect", proxy_connection_id);
+                                        tunnel_info_arc.lock().await.remove(&tunnel_id);
+                                        eprintln!("|{}| tcp_stream_node_read: not find, disconnect", tunnel_id);
                                         return;
                                     },
                                 }
                             }
                         },
                         Err(e) => {
-                            connection_info_arc.lock().await.remove(&proxy_connection_id.clone());
-                            eprintln!("|{}| tcp_stream_node_read: failed to read from socket; err = {:?}", proxy_connection_id, e);
+                            tunnel_info_arc.lock().await.remove(&tunnel_id.clone());
+                            eprintln!("|{}| tcp_stream_node_read: failed to read from socket; err = {:?}", tunnel_id, e);
                             return;
                         }
                     };
                 } else {
                     // read from node timeout
-                    connection_info_arc.lock().await.remove(&proxy_connection_id);
-                    eprintln!("|{}| tcp_stream_node_read: timeout", proxy_connection_id);
+                    tunnel_info_arc.lock().await.remove(&tunnel_id);
+                    eprintln!("|{}| tcp_stream_node_read: timeout", tunnel_id);
                     return;
                 }
 
@@ -162,38 +162,38 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                 if let Ok(r) = tokio::time::timeout(write_timeout, tcp_stream_target_write.write_all(&buf[0..count])).await {
                     match r {
                         Ok(_) => {
-                            let node_info = connection_info_arc.lock().await;
-                            let v = node_info.get(&proxy_connection_id);
+                            let node_info = tunnel_info_arc.lock().await;
+                            let v = node_info.get(&tunnel_id);
                             match v {
                                 Some((node_info, target_info)) => {
                                     let node_info_dump = node_info.clone();
                                     let mut target_info_dump = target_info.clone();
                                     target_info_dump.add_write_n(count as u64);
-                                    connection_info_arc.lock().await.insert(proxy_connection_id.clone(), (node_info_dump, target_info_dump));
+                                    tunnel_info_arc.lock().await.insert(tunnel_id.clone(), (node_info_dump, target_info_dump));
                                 },
                                 None => {
-                                    connection_info_arc.lock().await.remove(&proxy_connection_id);
-                                    eprintln!("|{}| tcp_stream_target_write: not find, disconnect", proxy_connection_id);
+                                    tunnel_info_arc.lock().await.remove(&tunnel_id);
+                                    eprintln!("|{}| tcp_stream_target_write: not find, disconnect", tunnel_id);
                                     return;
                                 },
                             }
                         }
                         Err(e) => {
-                            connection_info_arc.lock().await.remove(&proxy_connection_id);
-                            eprintln!("|{}| tcp_stream_target_write: failed to write to socket; err = {:?}", proxy_connection_id, e);
+                            tunnel_info_arc.lock().await.remove(&tunnel_id);
+                            eprintln!("|{}| tcp_stream_target_write: failed to write to socket; err = {:?}", tunnel_id, e);
                             return;
                         }
                     }
                 } else {
                     // write to target timeout
-                    connection_info_arc.lock().await.remove(&proxy_connection_id);
-                    eprintln!("|{}| tcp_stream_target_write: timeout", proxy_connection_id);
+                    tunnel_info_arc.lock().await.remove(&tunnel_id);
+                    eprintln!("|{}| tcp_stream_target_write: timeout", tunnel_id);
                     return;
                 }
             }
         });
 
-        // task of bytes reading from target connection or writing to node connection
+        // task of reading from target connection and then writing to node connection
         tokio::spawn(async move {
             let mut buf = [0; 1024];
             let mut count;
@@ -202,40 +202,40 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                 if let Ok(r) = tokio::time::timeout(read_timeout, tcp_stream_target_read.read(&mut buf)).await {
                     match r {
                         Ok(n) if n == 0 => {
-                            connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                            eprintln!("|{}| tcp_stream_target_read: closed by remote", proxy_connection_id_dump);
+                            tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                            eprintln!("|{}| tcp_stream_target_read: closed by remote", tunnel_id_dump);
                             return
                         },
                         Ok(n) => {
                             {
                                 count = n;
-                                let node_info = connection_info_arc_dump.lock().await;
-                                let v = node_info.get(&proxy_connection_id_dump);
+                                let node_info = tunnel_info_arc_dump.lock().await;
+                                let v = node_info.get(&tunnel_id_dump);
                                 match v {
                                     Some((node_info, target_info)) => {
                                         let node_info_dump = node_info.clone();
                                         let mut target_info_dump = target_info.clone();
                                         target_info_dump.add_read_n(n as u64);
-                                        connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
+                                        tunnel_info_arc_dump.lock().await.insert(tunnel_id_dump.clone(), (node_info_dump, target_info_dump));
                                     },
                                     None => {
-                                        connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                                        eprintln!("|{}| tcp_stream_target_read: not find, disconnect", proxy_connection_id_dump);
+                                        tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                                        eprintln!("|{}| tcp_stream_target_read: not find, disconnect", tunnel_id_dump);
                                         return
                                     },
                                 }
                             }
                         },
                         Err(e) => {
-                            connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                            eprintln!("|{}| tcp_stream_target_read: failed to read from socket; err = {:?}", proxy_connection_id_dump, e);
+                            tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                            eprintln!("|{}| tcp_stream_target_read: failed to read from socket; err = {:?}", tunnel_id_dump, e);
                             return;
                         }
                     };
                 } else {
                     // read from target timeout
-                    connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                    eprintln!("|{}| tcp_stream_target_read: timeout", proxy_connection_id_dump);
+                    tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                    eprintln!("|{}| tcp_stream_target_read: timeout", tunnel_id_dump);
                     return;
                 }
 
@@ -244,33 +244,33 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                     match r {
                         Ok(_) => {
                             {
-                                let node_info = connection_info_arc_dump.lock().await;
-                                let v = node_info.get(&proxy_connection_id_dump);
+                                let node_info = tunnel_info_arc_dump.lock().await;
+                                let v = node_info.get(&tunnel_id_dump);
                                 match v {
                                     Some((node_info, target_info)) => {
                                         let mut node_info_dump = node_info.clone();
                                         let target_info_dump = target_info.clone();
                                         node_info_dump.add_write_n(count as u64);
-                                        connection_info_arc_dump.lock().await.insert(proxy_connection_id_dump.clone(), (node_info_dump, target_info_dump));
+                                        tunnel_info_arc_dump.lock().await.insert(tunnel_id_dump.clone(), (node_info_dump, target_info_dump));
                                     },
                                     None => {
-                                        connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                                        eprintln!("|{}| tcp_stream_node_write: not find, disconnect", proxy_connection_id_dump);
+                                        tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                                        eprintln!("|{}| tcp_stream_node_write: not find, disconnect", tunnel_id_dump);
                                         return;
                                     },
                                 }
                             }
                         }
                         Err(e) => {
-                            connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                            eprintln!("|{}| tcp_stream_node_write: failed to write to socket; err = {:?}", proxy_connection_id_dump, e);
+                            tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                            eprintln!("|{}| tcp_stream_node_write: failed to write to socket; err = {:?}", tunnel_id_dump, e);
                             return;
                         }
                     }
                 } else {
                     // write to node timeout
-                    connection_info_arc_dump.lock().await.remove(&proxy_connection_id_dump);
-                    eprintln!("|{}| tcp_stream_node_write: timeout", proxy_connection_id_dump);
+                    tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                    eprintln!("|{}| tcp_stream_node_write: timeout", tunnel_id_dump);
                     return;
                 }
             }

@@ -95,7 +95,7 @@ impl TargetConnection {
 
 pub async fn get_target_conn_count_by_target_id(target_id: String, proxy_server: &ProxyServer) -> u32 {
     let mut target_conn: u32 = 0;
-    for (_, v) in proxy_server.connections_info.lock().await.iter() {
+    for (_, v) in proxy_server.tunnel_info.lock().await.iter() {
         if v.1.target_id == target_id {
             target_conn += 1;
         }
@@ -108,10 +108,23 @@ pub fn new_connection_id() -> String {
     format!("{:x}",connection_id).to_string()
 }
 
+pub fn new_tunnel_id() -> String {
+    let tunnel_id = Uuid::new_v4();
+    format!("{:x}",tunnel_id).to_string()
+}
+
 #[test]
 fn test_new_connection_id() {
     for _ in 0..10 {
         let conn_id = new_connection_id();
         println!("connection_id: {:?}", conn_id);
+    }
+}
+
+#[test]
+fn test_new_tunnel_id() {
+    for _ in 0..10 {
+        let tunnel_id = new_tunnel_id();
+        println!("tunnel_id: {:?}", tunnel_id);
     }
 }
