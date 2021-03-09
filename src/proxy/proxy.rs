@@ -78,8 +78,8 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
             }
         }
 
-        let node_connection_timeout = proxy_server.server_config.lb_node.timeout;
-        let target_connection_timeout = conn_target_info.clone().unwrap().target_timeout;
+        let node_connection_timeout = proxy_server.server_config.lb_node.timeout.clone();
+        let target_connection_timeout = conn_target_info.clone().unwrap().target_timeout.clone();
 
         let conn_target_id = calc_target_id_by_endpoint(conn_target_info.clone().unwrap().target_endpoint);
         let tcp_stream_target = tcp_stream_target.unwrap();
@@ -103,8 +103,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
         let tunnel_id_dump = tunnel_id.clone();
         let tunnel_info_arc_dump = tunnel_info_arc.clone();
 
-        let mut connection_info = proxy_server.tunnel_info.lock().await.clone();
-        connection_info.insert(tunnel_id.clone(), (node_connection_info, target_connection_info));
+        proxy_server.tunnel_info.lock().await.insert(tunnel_id.clone(), (node_connection_info, target_connection_info));
         println!("build tunnel |{}| successfully, node: {}->{}, target: {}->{}",
                  tunnel_id,
                  node_remote_addr.to_string(),
