@@ -41,7 +41,7 @@ pub fn calc_target_id_by_endpoint(endpoint: String) -> String {
     format!("{:x}",digest).to_string()
 }
 
-pub async fn init_targets_from_config(proxy_server: &mut ProxyServer) {
+pub async fn init_targets_from_config(proxy_server: &ProxyServer) {
     for target_config in proxy_server.server_config.lb_targets.iter() {
         let target= Target::new(
             target_config.target_endpoint.clone(),
@@ -68,7 +68,7 @@ impl TargetDump {
     }
 }
 
-pub async fn dump_targets(proxy_server: &mut ProxyServer, order: TargetDumpOrder) -> Vec<TargetDump> {
+pub async fn dump_targets(proxy_server: &ProxyServer, order: TargetDumpOrder) -> Vec<TargetDump> {
     let mut target_dump_vec = Vec::<TargetDump>::new();
     for (_, v) in proxy_server.targets_info.lock().await.iter(){
         let target_conn_count = get_target_conn_count_by_target_id(v.target_endpoint.clone(), proxy_server).await;

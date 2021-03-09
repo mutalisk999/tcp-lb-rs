@@ -28,7 +28,7 @@ impl ProxyServer {
     }
 }
 
-pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
+pub async fn start_tcp_proxy_server(proxy_server: &ProxyServer
     ) -> Result<(), Box<dyn Error>>{
 
     let node_listener = tokio::net::TcpListener::bind(proxy_server.server_config.lb_node.listen.as_str())
