@@ -125,23 +125,21 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                             return;
                         },
                         Ok(n) => {
-                            {
-                                count = n;
-                                let node_info = tunnel_info_arc.lock().await;
-                                let v = node_info.get(&tunnel_id);
-                                match v {
-                                    Some((node_info, target_info)) => {
-                                        let mut node_info_dump = node_info.clone();
-                                        let target_info_dump = target_info.clone();
-                                        node_info_dump.add_read_n(n as u64);
-                                        tunnel_info_arc.lock().await.insert(tunnel_id.clone(), (node_info_dump, target_info_dump));
-                                    },
-                                    None => {
-                                        tunnel_info_arc.lock().await.remove(&tunnel_id);
-                                        eprintln!("|{}| tcp_stream_node_read: not find, disconnect", tunnel_id);
-                                        return;
-                                    },
-                                }
+                            count = n;
+                            let node_info = tunnel_info_arc.lock().await;
+                            let v = node_info.get(&tunnel_id);
+                            match v {
+                                Some((node_info, target_info)) => {
+                                    let mut node_info_dump = node_info.clone();
+                                    let target_info_dump = target_info.clone();
+                                    node_info_dump.add_read_n(n as u64);
+                                    tunnel_info_arc.lock().await.insert(tunnel_id.clone(), (node_info_dump, target_info_dump));
+                                },
+                                None => {
+                                    tunnel_info_arc.lock().await.remove(&tunnel_id);
+                                    eprintln!("|{}| tcp_stream_node_read: not find, disconnect", tunnel_id);
+                                    return;
+                                },
                             }
                         },
                         Err(e) => {
@@ -206,23 +204,21 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                             return
                         },
                         Ok(n) => {
-                            {
-                                count = n;
-                                let node_info = tunnel_info_arc_dump.lock().await;
-                                let v = node_info.get(&tunnel_id_dump);
-                                match v {
-                                    Some((node_info, target_info)) => {
-                                        let node_info_dump = node_info.clone();
-                                        let mut target_info_dump = target_info.clone();
-                                        target_info_dump.add_read_n(n as u64);
-                                        tunnel_info_arc_dump.lock().await.insert(tunnel_id_dump.clone(), (node_info_dump, target_info_dump));
-                                    },
-                                    None => {
-                                        tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                                        eprintln!("|{}| tcp_stream_target_read: not find, disconnect", tunnel_id_dump);
-                                        return
-                                    },
-                                }
+                            count = n;
+                            let node_info = tunnel_info_arc_dump.lock().await;
+                            let v = node_info.get(&tunnel_id_dump);
+                            match v {
+                                Some((node_info, target_info)) => {
+                                    let node_info_dump = node_info.clone();
+                                    let mut target_info_dump = target_info.clone();
+                                    target_info_dump.add_read_n(n as u64);
+                                    tunnel_info_arc_dump.lock().await.insert(tunnel_id_dump.clone(), (node_info_dump, target_info_dump));
+                                },
+                                None => {
+                                    tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                                    eprintln!("|{}| tcp_stream_target_read: not find, disconnect", tunnel_id_dump);
+                                    return
+                                },
                             }
                         },
                         Err(e) => {
