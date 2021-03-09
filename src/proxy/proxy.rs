@@ -126,7 +126,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                         },
                         Ok(n) => {
                             count = n;
-                            let node_info = tunnel_info_arc.lock().await;
+                            let node_info = tunnel_info_arc.lock().await.clone();
                             let v = node_info.get(&tunnel_id);
                             match v {
                                 Some((node_info, target_info)) => {
@@ -159,7 +159,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                 if let Ok(r) = tokio::time::timeout(write_timeout, tcp_stream_target_write.write_all(&buf[0..count])).await {
                     match r {
                         Ok(_) => {
-                            let node_info = tunnel_info_arc.lock().await;
+                            let node_info = tunnel_info_arc.lock().await.clone();
                             let v = node_info.get(&tunnel_id);
                             match v {
                                 Some((node_info, target_info)) => {
@@ -205,7 +205,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                         },
                         Ok(n) => {
                             count = n;
-                            let node_info = tunnel_info_arc_dump.lock().await;
+                            let node_info = tunnel_info_arc_dump.lock().await.clone();
                             let v = node_info.get(&tunnel_id_dump);
                             match v {
                                 Some((node_info, target_info)) => {
@@ -239,7 +239,7 @@ pub async fn start_tcp_proxy(proxy_server: &mut ProxyServer
                     match r {
                         Ok(_) => {
                             {
-                                let node_info = tunnel_info_arc_dump.lock().await;
+                                let node_info = tunnel_info_arc_dump.lock().await.clone();
                                 let v = node_info.get(&tunnel_id_dump);
                                 match v {
                                     Some((node_info, target_info)) => {
