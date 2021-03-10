@@ -13,6 +13,7 @@ pub struct Config {
     pub lb_log: LogConfig,
     pub lb_node: NodeConfig,
     pub lb_targets: Vec<TargetConfig>,
+    pub lb_api: ApiConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -35,6 +36,11 @@ pub struct TargetConfig {
     pub target_active: bool,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct ApiConfig {
+    pub listen: String,
+}
+
 impl Config {
     pub fn check(&self) -> Result<(), Box<dyn Error>> {
         let _ : SocketAddr = self.lb_node.listen.parse()
@@ -43,6 +49,8 @@ impl Config {
             let _ : SocketAddr = t.target_endpoint.parse()
                 .expect(&*format!("Invalid target endpoint [{}]", t.target_endpoint));
         }
+        let _ : SocketAddr = self.lb_api.listen.parse()
+            .expect(&*format!("Invalid api endpoint [{}]", self.lb_api.listen));
         Ok(())
     }
 }

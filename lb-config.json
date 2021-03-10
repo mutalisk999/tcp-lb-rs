@@ -20,5 +20,8 @@
             "target_timeout": 60,
             "target_active": true
         }
-    ]
+    ],
+    "lb_api": {
+        "listen": "127.0.0.1:9000"
+    }
 }

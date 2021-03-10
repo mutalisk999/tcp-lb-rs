@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 use tokio;
 
 mod proxy;
@@ -5,6 +8,10 @@ use proxy::target::{init_targets_from_config};
 use proxy::proxy::{ProxyServer, start_tcp_proxy_server};
 use proxy::api::{start_api_server};
 
+
+lazy_static! {
+    static ref proxyserver: ProxyServer = ProxyServer::new();
+}
 
 async fn run(proxy_server: &ProxyServer) {
     // make sure config parameters valid
