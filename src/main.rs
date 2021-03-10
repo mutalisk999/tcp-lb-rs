@@ -1,37 +1,37 @@
 #[macro_use]
 extern crate lazy_static;
-
-use tokio;
+extern crate tokio;
 
 mod proxy;
 use proxy::target::{init_targets_from_config};
-use proxy::proxy::{ProxyServer, start_tcp_proxy_server};
+use proxy::proxy::{start_tcp_proxy_server};
+use proxy::connection::{start_maintain_loop};
 use proxy::api::{start_api_server};
+use std::ops::Deref;
 
+use proxy::g::SERVER_INFO;
 
-lazy_static! {
-    static ref proxyserver: ProxyServer = ProxyServer::new();
-}
-
-async fn run(proxy_server: &ProxyServer) {
+async fn run() {
     // make sure config parameters valid
-    let _ = proxy_server.server_config.check();
+    let _ = SERVER_INFO.deref().server_config.check();
 
     // init targets
-    init_targets_from_config(proxy_server).await;
-    println!("targets init, count: {}", proxy_server.targets_info.lock().await.len());
+    init_targets_from_config().await;
+    println!("targets init, count: {}", SERVER_INFO.deref().targets_info.lock().await.len());
 
-    let fut_tcp_proxy_server = start_tcp_proxy_server(proxy_server);
-    println!("starting tcp proxy server...");
+    let fut_tcp_proxy_server = start_tcp_proxy_server();
+    println!("starting tcp proxy server, listen on [{}]...", SERVER_INFO.deref().server_config.lb_node.listen.clone());
 
-    let fut_api_server = start_api_server(proxy_server);
-    println!("starting api server...");
+    let fut_api_server = start_api_server();
+    println!("starting api server, listen on [{}]... ", SERVER_INFO.deref().server_config.lb_api.listen.clone());
 
-    let (_, _) = tokio::join!(fut_tcp_proxy_server, fut_api_server);
+    let fut_maintain_loop = start_maintain_loop();
+    println!("starting maintain loop...");
+
+    let (_, _, _) = tokio::join!(fut_tcp_proxy_server, fut_api_server, fut_maintain_loop);
 }
 
 #[tokio::main]
 async fn main() {
-    let mut server_info = ProxyServer::new();
-    run(&mut server_info).await;
+    run().await;
 }

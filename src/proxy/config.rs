@@ -1,5 +1,5 @@
 // #[macro_use]
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
 use std::fs::File;
 use std::io::prelude::*;
 use std::vec::Vec;
@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 
 const CONFIG_FILE_NAME: &'static str = "lb-config.json";
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub lb_log: LogConfig,
     pub lb_node: NodeConfig,
@@ -16,19 +16,19 @@ pub struct Config {
     pub lb_api: ApiConfig,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LogConfig {
     pub log_set_level: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NodeConfig {
     pub listen: String,
     pub max_conn: u32,
     pub timeout: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TargetConfig {
     pub target_endpoint: String,
     pub target_max_conn: u32,
@@ -36,7 +36,7 @@ pub struct TargetConfig {
     pub target_active: bool,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ApiConfig {
     pub listen: String,
 }

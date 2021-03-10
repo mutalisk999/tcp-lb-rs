@@ -1,6 +1,10 @@
 use uuid::Uuid;
 
-use crate::proxy::proxy::{ProxyServer};
+use crate::proxy::g::SERVER_INFO;
+use std::ops::Deref;
+use chrono::Utc;
+use std::error::Error;
+use tokio;
 
 
 #[derive(Debug, Clone)]
@@ -25,9 +29,9 @@ impl Connection {
             connect_id: new_connection_id(),
             local_endpoint,
             remote_endpoint,
-            start_time_1m: 0,
-            start_time_5m: 0,
-            start_time_30m: 0,
+            start_time_1m: Utc::now().timestamp_nanos().clone(),
+            start_time_5m: Utc::now().timestamp_nanos().clone(),
+            start_time_30m: Utc::now().timestamp_nanos().clone(),
             read_bytes_1m: 0,
             read_bytes_5m: 0,
             read_bytes_30m: 0,
@@ -47,6 +51,24 @@ impl Connection {
         self.write_bytes_1m += write_n.clone();
         self.write_bytes_5m += write_n.clone();
         self.write_bytes_30m += write_n.clone();
+    }
+
+    pub fn reset_read_write_bytes_1m(&mut self) {
+        self.start_time_1m = Utc::now().timestamp_nanos().clone();
+        self.read_bytes_1m = 0;
+        self.write_bytes_1m = 0;
+    }
+
+    pub fn reset_read_write_bytes_5m(&mut self) {
+        self.start_time_5m = Utc::now().timestamp_nanos().clone();
+        self.read_bytes_5m = 0;
+        self.write_bytes_5m = 0;
+    }
+
+    pub fn reset_read_write_bytes_30m(&mut self) {
+        self.start_time_30m = Utc::now().timestamp_nanos().clone();
+        self.read_bytes_30m = 0;
+        self.write_bytes_30m = 0;
     }
 }
 
@@ -93,9 +115,9 @@ impl TargetConnection {
     }
 }
 
-pub async fn get_target_conn_count_by_target_id(target_id: String, proxy_server: &ProxyServer) -> u32 {
+pub async fn get_target_conn_count_by_target_id(target_id: String) -> u32 {
     let mut target_conn: u32 = 0;
-    for (_, v) in proxy_server.tunnel_info.lock().await.iter() {
+    for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
         if v.1.target_id == target_id {
             target_conn += 1;
         }
@@ -111,6 +133,38 @@ pub fn new_connection_id() -> String {
 pub fn new_tunnel_id() -> String {
     let tunnel_id = Uuid::new_v4();
     format!("{:x}",tunnel_id).to_string()
+}
+
+pub async fn start_maintain_loop() -> Result<(), Box<dyn Error>> {
+    let mut maintain_index: u64 = 0;
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
+        if maintain_index.clone() % 1 == 0 {
+            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut(){
+                let mut node_connection_dump = v.0.clone();
+                node_connection_dump.connection.reset_read_write_bytes_1m();
+                let mut target_connection_dump = v.1.clone();
+                target_connection_dump.connection.reset_read_write_bytes_1m();
+            }
+        } else if maintain_index.clone() % 5 == 0 {
+            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut(){
+                let mut node_connection_dump = v.0.clone();
+                node_connection_dump.connection.reset_read_write_bytes_5m();
+                let mut target_connection_dump = v.1.clone();
+                target_connection_dump.connection.reset_read_write_bytes_5m();
+            }
+        } else if maintain_index.clone() % 30 == 0 {
+            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut(){
+                let mut node_connection_dump = v.0.clone();
+                node_connection_dump.connection.reset_read_write_bytes_30m();
+                let mut target_connection_dump = v.1.clone();
+                target_connection_dump.connection.reset_read_write_bytes_30m();
+            }
+        }
+
+        maintain_index += 1;
+    }
 }
 
 #[test]

@@ -14,5 +14,7 @@ md5 = "0.7.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 hyper = { version = "0.14.4", features = ["full"] }
 lazy_static = "1.4.0"
+chrono = "0.4"
+url = "2.2.1"
 
 

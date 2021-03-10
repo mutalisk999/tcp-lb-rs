@@ -9,6 +9,8 @@ use crate::proxy::config::Config;
 use crate::proxy::connection::{NodeConnection, TargetConnection, new_tunnel_id};
 use crate::proxy::target::{Target, TargetDumpOrder, calc_target_id_by_endpoint, dump_targets};
 use crate::proxy::config::{read_config};
+use crate::proxy::g::SERVER_INFO;
+use std::ops::Deref;
 
 
 #[derive(Debug)]
@@ -28,17 +30,15 @@ impl ProxyServer {
     }
 }
 
-pub async fn start_tcp_proxy_server(proxy_server: &ProxyServer
-    ) -> Result<(), Box<dyn Error>>{
-
-    let node_listener = tokio::net::TcpListener::bind(proxy_server.server_config.lb_node.listen.as_str())
-        .await.expect(format!("Failure binding node listen endpoint [{}]", proxy_server.server_config.lb_node.listen).as_str());
+pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
+    let node_listener = tokio::net::TcpListener::bind(SERVER_INFO.deref().server_config.lb_node.listen.as_str())
+        .await.expect(format!("Failure binding node listen endpoint [{}]", SERVER_INFO.deref().server_config.lb_node.listen).as_str());
 
     loop {
         let (mut tcp_stream_node, node_remote_addr) = node_listener.accept().await?;
         println!("remote connection from {}", node_remote_addr);
 
-        let targets_dump = dump_targets(proxy_server, TargetDumpOrder::AscOrder).await;
+        let targets_dump = dump_targets(TargetDumpOrder::AscOrder).await;
 
         let mut tcp_stream_target: Option<tokio::net::TcpStream> = None;
         let mut conn_target_info: Option<Target> = None;
@@ -78,7 +78,7 @@ pub async fn start_tcp_proxy_server(proxy_server: &ProxyServer
             }
         }
 
-        let node_connection_timeout = proxy_server.server_config.lb_node.timeout.clone();
+        let node_connection_timeout = SERVER_INFO.deref().server_config.lb_node.timeout.clone();
         let target_connection_timeout = conn_target_info.clone().unwrap().target_timeout.clone();
 
         let conn_target_id = calc_target_id_by_endpoint(conn_target_info.clone().unwrap().target_endpoint);
@@ -89,7 +89,7 @@ pub async fn start_tcp_proxy_server(proxy_server: &ProxyServer
         let (mut tcp_stream_target_read, mut tcp_stream_target_write) = tcp_stream_target.into_split();
 
         let node_connection_info = NodeConnection::new(
-            proxy_server.server_config.lb_node.listen.clone(),
+            SERVER_INFO.deref().server_config.lb_node.listen.clone(),
             node_remote_addr.to_string());
 
         let target_connection_info = TargetConnection::new(
@@ -99,15 +99,15 @@ pub async fn start_tcp_proxy_server(proxy_server: &ProxyServer
         );
 
         let tunnel_id = new_tunnel_id();
-        let tunnel_info_arc = proxy_server.tunnel_info.clone();
+        let tunnel_info_arc = Arc::clone(&SERVER_INFO.deref().tunnel_info);
         let tunnel_id_dump = tunnel_id.clone();
-        let tunnel_info_arc_dump = tunnel_info_arc.clone();
+        let tunnel_info_arc_dump = Arc::clone(&tunnel_info_arc);
 
-        proxy_server.tunnel_info.lock().await.insert(tunnel_id.clone(), (node_connection_info, target_connection_info));
+        SERVER_INFO.deref().tunnel_info.lock().await.insert(tunnel_id.clone(), (node_connection_info, target_connection_info));
         println!("build tunnel |{}| successfully, node: {}->{}, target: {}->{}",
                  tunnel_id,
                  node_remote_addr.to_string(),
-                 proxy_server.server_config.lb_node.listen.clone(),
+                 SERVER_INFO.deref().server_config.lb_node.listen.clone(),
                  target_local_addr.clone(),
                  conn_target_info.clone().unwrap().target_endpoint);
 
