@@ -39,6 +39,12 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
         let (mut tcp_stream_node, node_remote_addr) = node_listener.accept().await?;
         info!("remote connection from {}", node_remote_addr);
 
+        let node_connection_count = SERVER_INFO.deref().tunnel_info.lock().await.len() as u32;
+        if node_connection_count > SERVER_INFO.deref().server_config.lb_node.max_conn {
+            let _ = tcp_stream_node.shutdown().await;
+            continue;
+        }
+
         let targets_dump = dump_targets(TargetDumpOrder::AscOrder).await;
 
         let mut tcp_stream_target: Option<tokio::net::TcpStream> = None;
