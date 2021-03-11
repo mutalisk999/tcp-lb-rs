@@ -58,6 +58,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fdlimit"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c4c9e43643f5a3be4ca5b67d26b98031ff9db6806c3440ae32e02e3ceac3f1b"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "flexi_logger"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -586,6 +595,7 @@ name = "tcp_lb_rs"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "fdlimit",
  "flexi_logger",
  "hyper",
  "lazy_static",

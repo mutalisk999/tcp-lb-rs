@@ -12,6 +12,7 @@ use log::{info};
 
 use proxy::g::SERVER_INFO;
 use flexi_logger::{Duplicate, detailed_format};
+use fdlimit::raise_fd_limit;
 
 fn init_log() {
     flexi_logger::Logger::with_str(SERVER_INFO.deref().server_config.lb_log.log_set_level.clone())
@@ -31,6 +32,16 @@ async fn run() {
 
     // init log
     init_log();
+
+    // raise fd limit to max
+    match raise_fd_limit() {
+        Some(val) => {
+            info!("raise system fd limit to {}", val);
+        }
+        None => {
+            info!("not support to raise system fd limit");
+        }
+    }
 
     // init targets
     init_targets_from_config().await;

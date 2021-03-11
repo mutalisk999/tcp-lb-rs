@@ -18,5 +18,6 @@ chrono = "0.4"
 url = "2.2.1"
 flexi_logger = "0.17"
 log = "0.4.14"
+fdlimit = "0.2.1"
 
 
