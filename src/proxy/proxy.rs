@@ -11,6 +11,7 @@ use crate::proxy::target::{Target, TargetDumpOrder, calc_target_id_by_endpoint, 
 use crate::proxy::config::{read_config};
 use crate::proxy::g::SERVER_INFO;
 use std::ops::Deref;
+use log::{error, info};
 
 
 #[derive(Debug)]
@@ -36,7 +37,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
 
     loop {
         let (mut tcp_stream_node, node_remote_addr) = node_listener.accept().await?;
-        println!("remote connection from {}", node_remote_addr);
+        info!("remote connection from {}", node_remote_addr);
 
         let targets_dump = dump_targets(TargetDumpOrder::AscOrder).await;
 
@@ -104,7 +105,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
         let tunnel_info_arc_dump = Arc::clone(&tunnel_info_arc);
 
         SERVER_INFO.deref().tunnel_info.lock().await.insert(tunnel_id.clone(), (node_connection_info, target_connection_info));
-        println!("build tunnel |{}| successfully, node: {}->{}, target: {}->{}",
+        info!("build tunnel |{}| successfully, node: {}->{}, target: {}->{}",
                  tunnel_id,
                  node_remote_addr.to_string(),
                  SERVER_INFO.deref().server_config.lb_node.listen.clone(),
@@ -121,7 +122,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                     match r {
                         Ok(n) if n == 0 => {
                             tunnel_info_arc.lock().await.remove(&tunnel_id);
-                            eprintln!("|{}| tcp_stream_node_read: closed by remote", tunnel_id);
+                            info!("|{}| tcp_stream_node_read: closed by remote", tunnel_id);
                             return;
                         },
                         Ok(n) => {
@@ -139,21 +140,21 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                                 None => {
                                     drop(tunnel_info);
                                     tunnel_info_arc.lock().await.remove(&tunnel_id);
-                                    eprintln!("|{}| tcp_stream_node_read: not find, disconnect", tunnel_id);
+                                    error!("|{}| tcp_stream_node_read: not find, disconnect", tunnel_id);
                                     return;
                                 },
                             }
                         },
                         Err(e) => {
                             tunnel_info_arc.lock().await.remove(&tunnel_id.clone());
-                            eprintln!("|{}| tcp_stream_node_read: failed to read from socket; err = {:?}", tunnel_id, e);
+                            error!("|{}| tcp_stream_node_read: failed to read from socket; err = {:?}", tunnel_id, e);
                             return;
                         }
                     };
                 } else {
                     // read from node timeout
                     tunnel_info_arc.lock().await.remove(&tunnel_id);
-                    eprintln!("|{}| tcp_stream_node_read: timeout", tunnel_id);
+                    error!("|{}| tcp_stream_node_read: timeout", tunnel_id);
                     return;
                 }
 
@@ -174,21 +175,21 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                                 None => {
                                     drop(tunnel_info);
                                     tunnel_info_arc.lock().await.remove(&tunnel_id);
-                                    eprintln!("|{}| tcp_stream_target_write: not find, disconnect", tunnel_id);
+                                    error!("|{}| tcp_stream_target_write: not find, disconnect", tunnel_id);
                                     return;
                                 },
                             }
                         }
                         Err(e) => {
                             tunnel_info_arc.lock().await.remove(&tunnel_id);
-                            eprintln!("|{}| tcp_stream_target_write: failed to write to socket; err = {:?}", tunnel_id, e);
+                            error!("|{}| tcp_stream_target_write: failed to write to socket; err = {:?}", tunnel_id, e);
                             return;
                         }
                     }
                 } else {
                     // write to target timeout
                     tunnel_info_arc.lock().await.remove(&tunnel_id);
-                    eprintln!("|{}| tcp_stream_target_write: timeout", tunnel_id);
+                    error!("|{}| tcp_stream_target_write: timeout", tunnel_id);
                     return;
                 }
             }
@@ -204,7 +205,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                     match r {
                         Ok(n) if n == 0 => {
                             tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                            eprintln!("|{}| tcp_stream_target_read: closed by remote", tunnel_id_dump);
+                            info!("|{}| tcp_stream_target_read: closed by remote", tunnel_id_dump);
                             return
                         },
                         Ok(n) => {
@@ -222,21 +223,21 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                                 None => {
                                     drop(tunnel_info);
                                     tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                                    eprintln!("|{}| tcp_stream_target_read: not find, disconnect", tunnel_id_dump);
+                                    error!("|{}| tcp_stream_target_read: not find, disconnect", tunnel_id_dump);
                                     return
                                 },
                             }
                         },
                         Err(e) => {
                             tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                            eprintln!("|{}| tcp_stream_target_read: failed to read from socket; err = {:?}", tunnel_id_dump, e);
+                            error!("|{}| tcp_stream_target_read: failed to read from socket; err = {:?}", tunnel_id_dump, e);
                             return;
                         }
                     };
                 } else {
                     // read from target timeout
                     tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                    eprintln!("|{}| tcp_stream_target_read: timeout", tunnel_id_dump);
+                    error!("|{}| tcp_stream_target_read: timeout", tunnel_id_dump);
                     return;
                 }
 
@@ -258,7 +259,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                                     None => {
                                         drop(tunnel_info);
                                         tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                                        eprintln!("|{}| tcp_stream_node_write: not find, disconnect", tunnel_id_dump);
+                                        error!("|{}| tcp_stream_node_write: not find, disconnect", tunnel_id_dump);
                                         return;
                                     },
                                 }
@@ -266,14 +267,14 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                         }
                         Err(e) => {
                             tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                            eprintln!("|{}| tcp_stream_node_write: failed to write to socket; err = {:?}", tunnel_id_dump, e);
+                            error!("|{}| tcp_stream_node_write: failed to write to socket; err = {:?}", tunnel_id_dump, e);
                             return;
                         }
                     }
                 } else {
                     // write to node timeout
                     tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                    eprintln!("|{}| tcp_stream_node_write: timeout", tunnel_id_dump);
+                    error!("|{}| tcp_stream_node_write: timeout", tunnel_id_dump);
                     return;
                 }
             }

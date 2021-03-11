@@ -1,6 +1,6 @@
 {
     "lb_log": {
-        "log_set_level": 10
+        "log_set_level": "debug"
     },
     "lb_node": {
         "listen": "0.0.0.0:8080",

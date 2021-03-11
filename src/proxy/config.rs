@@ -18,7 +18,7 @@ pub struct Config {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LogConfig {
-    pub log_set_level: u32,
+    pub log_set_level: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
