@@ -3,7 +3,6 @@ use serde::{Serialize, Deserialize};
 
 use std::error::Error;
 
-// use futures_util::TryStreamExt;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 
@@ -162,11 +161,11 @@ impl TunnelInfoResp {
 async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     match (req.method(), req.uri().path()) {
         // Serve some instructions at /
-        (&Method::GET, "/") => Ok(Response::new(Body::from(
+        (&Method::GET, "/") | (&Method::POST, "/") => Ok(Response::new(Body::from(
             "<h1>Hello World</h1>",
         ))),
 
-        (&Method::GET, "/api/get_node_info") => {
+        (&Method::GET, "/api/get_node_info") | (&Method::POST, "/api/get_node_info") => {
             let node_info_resp = NodeInfoResp::new(
                 SERVER_INFO.deref().server_config.lb_node.listen.clone(),
                 SERVER_INFO.deref().server_config.lb_node.max_conn.clone(),
@@ -178,7 +177,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             Ok(Response::new(Body::from(ret_str)))
         },
 
-        (&Method::GET, "/api/get_targets_info") => {
+        (&Method::GET, "/api/get_targets_info") | (&Method::POST, "/api/get_targets_info") => {
             let mut targets_info_resp = vec![];
             for (k, target) in SERVER_INFO.deref().targets_info.lock().await.iter() {
                 let target_info_resp = TargetInfoResp::new(
@@ -196,11 +195,21 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             Ok(Response::new(Body::from(ret_str)))
         },
 
-        (&Method::POST, "/api/get_target_tunnel_info") => {
-            let b = hyper::body::to_bytes(req).await?;
-            let params = form_urlencoded::parse(b.as_ref())
-                .into_owned()
-                .collect::<HashMap<String, String>>();
+        (&Method::GET, "/api/get_target_tunnel_info") | (&Method::POST, "/api/get_target_tunnel_info") => {
+            // try to parse query string params from url
+            let mut params = req.uri().query()
+                    .map(|v| {
+                        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+                    }).unwrap_or_else(HashMap::new);
+
+            if params.len() == 0 {
+                // try to parse query string params from body
+                let b = hyper::body::to_bytes(req).await?;
+                params = form_urlencoded::parse(b.as_ref())
+                    .into_owned()
+                    .collect::<HashMap<String, String>>();
+            }
+
             let target_id = if let Some(target_id) = params.get("target_id") {
                 target_id
             } else {
@@ -251,7 +260,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             Ok(Response::new(Body::from(ret_str)))
         },
 
-        (&Method::GET, "/api/get_tunnel_info") => {
+        (&Method::GET, "/api/get_tunnel_info") | (&Method::POST, "/api/get_tunnel_info") => {
             let mut target_tunnel_info = vec![];
             for(k, v) in SERVER_INFO.tunnel_info.lock().await.iter() {
                 let (node_connection, target_connection) = v.clone();
