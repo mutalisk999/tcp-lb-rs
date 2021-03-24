@@ -220,7 +220,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             };
 
             let mut target_tunnel_info = vec![];
-            for(k, v) in SERVER_INFO.tunnel_info.lock().await.iter() {
+            for(k, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
                 if target_id.deref() == v.1.target_id {
                     let (node_connection, target_connection) = v.clone();
                     let node_connection_resp = NodeConnectionInfoResp::new(
@@ -262,7 +262,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
 
         (&Method::GET, "/api/get_tunnel_info") | (&Method::POST, "/api/get_tunnel_info") => {
             let mut target_tunnel_info = vec![];
-            for(k, v) in SERVER_INFO.tunnel_info.lock().await.iter() {
+            for(k, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
                 let (node_connection, target_connection) = v.clone();
                 let node_connection_resp = NodeConnectionInfoResp::new(
                     node_connection.connection.connect_id.clone(),

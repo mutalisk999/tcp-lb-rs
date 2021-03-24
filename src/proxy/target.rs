@@ -43,14 +43,14 @@ pub fn calc_target_id_by_endpoint(endpoint: String) -> String {
 }
 
 pub async fn init_targets_from_config() {
-    for target_config in SERVER_INFO.server_config.lb_targets.iter() {
+    for target_config in SERVER_INFO.deref().server_config.lb_targets.iter() {
         let target= Target::new(
             target_config.target_endpoint.clone(),
             target_config.target_max_conn,
             target_config.target_timeout,
             target_config.target_active, true);
 
-        SERVER_INFO.targets_info.lock().await.insert(calc_target_id_by_endpoint(target.clone().target_endpoint),target);
+        SERVER_INFO.deref().targets_info.lock().await.insert(calc_target_id_by_endpoint(target.clone().target_endpoint),target);
     }
 }
 
