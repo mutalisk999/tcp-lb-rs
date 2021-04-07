@@ -72,7 +72,7 @@ impl TargetDump {
 pub async fn dump_targets(order: TargetDumpOrder) -> Vec<TargetDump> {
     let mut target_dump_vec = Vec::<TargetDump>::new();
     for (_, v) in SERVER_INFO.deref().targets_info.lock().await.iter(){
-        let target_conn_count = get_target_conn_count_by_target_id(v.target_endpoint.clone()).await;
+        let target_conn_count = get_target_conn_count_by_target_id(calc_target_id_by_endpoint(v.target_endpoint.clone())).await;
         let target_dump = TargetDump::new(v.target_endpoint.clone(), v.target_max_conn,  target_conn_count,
                                            v.target_timeout, v.target_active, v.target_status);
         target_dump_vec.push(target_dump);

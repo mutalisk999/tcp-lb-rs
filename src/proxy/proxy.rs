@@ -74,6 +74,8 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
 
                 conn_target_info = Some(t.target.clone());
                 break;
+            } else {
+                continue;
             }
         }
 
