@@ -5,7 +5,11 @@
     "lb_node": {
         "listen": "0.0.0.0:8080",
         "max_conn": 10000,
-        "timeout": 60
+        "timeout": 60,
+        "enable_local_endpoints": false,
+        "local_endpoints": [
+            "172.17.196.229:0"
+        ]
     },
     "lb_targets": [
         {

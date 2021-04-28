@@ -4,12 +4,14 @@ use std::error::Error;
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{Ordering};
+use std::net::SocketAddr;
 
 use crate::proxy::config::Config;
 use crate::proxy::connection::{NodeConnection, TargetConnection, new_tunnel_id};
 use crate::proxy::target::{Target, TargetDumpOrder, calc_target_id_by_endpoint, dump_targets};
 use crate::proxy::config::{read_config};
-use crate::proxy::g::SERVER_INFO;
+use crate::proxy::g::{SERVER_INFO,NODE_LOCAL_SELECTOR};
 use std::ops::Deref;
 use log::{error, info};
 
@@ -50,7 +52,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
         let mut tcp_stream_target: Option<tokio::net::TcpStream> = None;
         let mut conn_target_info: Option<Target> = None;
 
-        // try to connect from the least connection of the target
+        // try to connect to the target with the least connection
         for t in targets_dump.iter() {
             if !t.target.target_active {
                 continue;
@@ -61,7 +63,25 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
 
             let r = tokio::net::TcpSocket::new_v4();
             let socket_conn = match r {
-                Ok(s) => Some(s),
+                Ok(s) => {
+                    if SERVER_INFO.deref().server_config.lb_node.enable_local_endpoints &&
+                        SERVER_INFO.deref().server_config.lb_node.local_endpoints.len() > 0 {
+                        let u = NODE_LOCAL_SELECTOR.deref().load(Ordering::Relaxed);
+                        NODE_LOCAL_SELECTOR.deref().store(u+1, Ordering::Relaxed);
+
+                        let local_socket_addr : SocketAddr = SERVER_INFO.deref().server_config
+                            .lb_node.local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))].parse()
+                            .expect(&*format!("Invalid node local endpoint [{}]",
+                                              SERVER_INFO.deref().server_config.lb_node
+                                                  .local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))]));
+
+                        s.bind(local_socket_addr)
+                            .expect(&*format!("Bind node local endpoint [{}] fail",
+                                              SERVER_INFO.deref().server_config.lb_node
+                                                  .local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))]));
+                    }
+                    Some(s)
+                },
                 Err(_) => continue
             };
             let connect_timeout = tokio::time::Duration::from_secs(5);

@@ -26,6 +26,8 @@ pub struct NodeConfig {
     pub listen: String,
     pub max_conn: u32,
     pub timeout: u32,
+    pub enable_local_endpoints: bool,
+    pub local_endpoints: Vec<String>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -45,6 +47,10 @@ impl Config {
     pub fn check(&self) -> Result<(), Box<dyn Error>> {
         let _ : SocketAddr = self.lb_node.listen.parse()
             .expect(&*format!("Invalid node endpoint [{}]", self.lb_node.listen));
+        for t in self.lb_node.local_endpoints.iter() {
+            let _ : SocketAddr = t.parse()
+                .expect(&*format!("Invalid node local endpoint [{}]", t));
+        }
         for t in self.lb_targets.iter() {
             let _ : SocketAddr = t.target_endpoint.parse()
                 .expect(&*format!("Invalid target endpoint [{}]", t.target_endpoint));
