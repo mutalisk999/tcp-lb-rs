@@ -1,9 +1,9 @@
-# tcp_lb_rs
+# tcp-lb-rs
 tcp load balancer written by rust
 
 ```
-git clone https://github.com/mutalisk999/tcp_lb_rs.git
+git clone https://github.com/mutalisk999/tcp-lb-rs.git
 
-cd tcp_lb_rs
+cd tcp-lb-rs
 cargo build --release
 ```
