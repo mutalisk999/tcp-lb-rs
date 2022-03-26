@@ -2,3 +2,5 @@
 **/*.rs.bk
 
 *.log
+
+lb-config.json
