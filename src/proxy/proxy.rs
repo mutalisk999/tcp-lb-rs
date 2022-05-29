@@ -33,6 +33,62 @@ impl ProxyServer {
     }
 }
 
+pub async fn connect_to_target_with_least_conn() -> (Option<tokio::net::TcpStream>, Option<Target>) {
+    let targets_dump = dump_targets(TargetDumpOrder::AscOrder).await;
+
+    let mut tcp_stream_target: Option<tokio::net::TcpStream> = None;
+    let mut conn_target_info: Option<Target> = None;
+
+    // try to connect to the target with the least connection
+    for t in targets_dump.iter() {
+        if !t.target.target_active {
+            continue;
+        }
+        if t.target_conn_count > t.target.target_max_conn {
+            continue;
+        }
+
+        let r = tokio::net::TcpSocket::new_v4();
+        let socket_conn = match r {
+            Ok(s) => {
+                if SERVER_INFO.deref().server_config.lb_node.enable_local_endpoints &&
+                    SERVER_INFO.deref().server_config.lb_node.local_endpoints.len() > 0 {
+                    let u = NODE_LOCAL_SELECTOR.deref().load(Ordering::Relaxed);
+                    NODE_LOCAL_SELECTOR.deref().store(u+1, Ordering::Relaxed);
+
+                    let local_socket_addr : SocketAddr = SERVER_INFO.deref().server_config
+                        .lb_node.local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))].parse()
+                        .expect(&*format!("Invalid node local endpoint [{}]",
+                                          SERVER_INFO.deref().server_config.lb_node
+                                              .local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))]));
+
+                    s.bind(local_socket_addr)
+                        .expect(&*format!("Bind node local endpoint [{}] fail",
+                                          SERVER_INFO.deref().server_config.lb_node
+                                              .local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))]));
+                }
+                Some(s)
+            },
+            Err(_) => continue
+        };
+        let connect_timeout = tokio::time::Duration::from_secs(5);
+        if let Ok(r) = tokio::time::timeout(connect_timeout,
+                                            socket_conn.unwrap().connect(t.target.target_endpoint.parse().unwrap())).await {
+            tcp_stream_target = match r {
+                Ok(c) => Some(c),
+                Err(_) => continue
+            };
+
+            conn_target_info = Some(t.target.clone());
+            break;
+        } else {
+            continue;
+        }
+    }
+
+    return (tcp_stream_target, conn_target_info)
+}
+
 pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
     let node_listener = tokio::net::TcpListener::bind(SERVER_INFO.deref().server_config.lb_node.listen.as_str())
         .await.expect(format!("Failure binding node listen endpoint [{}]", SERVER_INFO.deref().server_config.lb_node.listen).as_str());
@@ -47,57 +103,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
             continue;
         }
 
-        let targets_dump = dump_targets(TargetDumpOrder::AscOrder).await;
-
-        let mut tcp_stream_target: Option<tokio::net::TcpStream> = None;
-        let mut conn_target_info: Option<Target> = None;
-
-        // try to connect to the target with the least connection
-        for t in targets_dump.iter() {
-            if !t.target.target_active {
-                continue;
-            }
-            if t.target_conn_count > t.target.target_max_conn {
-                continue;
-            }
-
-            let r = tokio::net::TcpSocket::new_v4();
-            let socket_conn = match r {
-                Ok(s) => {
-                    if SERVER_INFO.deref().server_config.lb_node.enable_local_endpoints &&
-                        SERVER_INFO.deref().server_config.lb_node.local_endpoints.len() > 0 {
-                        let u = NODE_LOCAL_SELECTOR.deref().load(Ordering::Relaxed);
-                        NODE_LOCAL_SELECTOR.deref().store(u+1, Ordering::Relaxed);
-
-                        let local_socket_addr : SocketAddr = SERVER_INFO.deref().server_config
-                            .lb_node.local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))].parse()
-                            .expect(&*format!("Invalid node local endpoint [{}]",
-                                              SERVER_INFO.deref().server_config.lb_node
-                                                  .local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))]));
-
-                        s.bind(local_socket_addr)
-                            .expect(&*format!("Bind node local endpoint [{}] fail",
-                                              SERVER_INFO.deref().server_config.lb_node
-                                                  .local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))]));
-                    }
-                    Some(s)
-                },
-                Err(_) => continue
-            };
-            let connect_timeout = tokio::time::Duration::from_secs(5);
-            if let Ok(r) = tokio::time::timeout(connect_timeout,
-                                         socket_conn.unwrap().connect(t.target.target_endpoint.parse().unwrap())).await {
-                tcp_stream_target = match r {
-                    Ok(c) => Some(c),
-                    Err(_) => continue
-                };
-
-                conn_target_info = Some(t.target.clone());
-                break;
-            } else {
-                continue;
-            }
-        }
+        let (tcp_stream_target, conn_target_info) = connect_to_target_with_least_conn().await;
 
         match tcp_stream_target {
             Some(_) => (),

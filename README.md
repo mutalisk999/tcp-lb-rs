@@ -1,5 +1,6 @@
 # tcp-lb-rs
-tcp load balancer written by rust
+tcp load balancer powered by [tokio](https://github.com/tokio-rs/tokio)
+
 
 ```
 git clone https://github.com/mutalisk999/tcp-lb-rs.git
