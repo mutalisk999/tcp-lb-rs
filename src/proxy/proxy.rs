@@ -113,8 +113,8 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
             }
         }
 
-        let node_connection_timeout = SERVER_INFO.deref().server_config.lb_node.timeout.clone();
-        let target_connection_timeout = conn_target_info.clone().unwrap().target_timeout.clone();
+        let node_timeout = SERVER_INFO.deref().server_config.lb_node.timeout.clone();
+        let target_timeout = conn_target_info.clone().unwrap().target_timeout.clone();
 
         let conn_target_id = calc_target_id_by_endpoint(conn_target_info.clone().unwrap().target_endpoint);
         let tcp_stream_target = tcp_stream_target.unwrap();
@@ -151,7 +151,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
             let mut buf = [0; 1024];
             let mut count;
             loop {
-                let read_timeout = tokio::time::Duration::from_secs(node_connection_timeout as u64);
+                let read_timeout = tokio::time::Duration::from_secs(node_timeout as u64);
                 if let Ok(r) = tokio::time::timeout(read_timeout, tcp_stream_node_read.read(&mut buf)).await {
                     match r {
                         Ok(n) if n == 0 => {
@@ -192,7 +192,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                     return;
                 }
 
-                let write_timeout = tokio::time::Duration::from_secs(target_connection_timeout as u64);
+                let write_timeout = tokio::time::Duration::from_secs(target_timeout as u64);
                 if let Ok(r) = tokio::time::timeout(write_timeout, tcp_stream_target_write.write_all(&buf[0..count])).await {
                     match r {
                         Ok(_) => {
@@ -234,7 +234,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
             let mut buf = [0; 1024];
             let mut count;
             loop {
-                let read_timeout = tokio::time::Duration::from_secs(target_connection_timeout as u64);
+                let read_timeout = tokio::time::Duration::from_secs(target_timeout as u64);
                 if let Ok(r) = tokio::time::timeout(read_timeout, tcp_stream_target_read.read(&mut buf)).await {
                     match r {
                         Ok(n) if n == 0 => {
@@ -275,7 +275,7 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                     return;
                 }
 
-                let write_timeout = tokio::time::Duration::from_secs(node_connection_timeout as u64);
+                let write_timeout = tokio::time::Duration::from_secs(node_timeout as u64);
                 if let Ok(r) = tokio::time::timeout(write_timeout, tcp_stream_node_write.write_all(&buf[0..count])).await {
                     match r {
                         Ok(_) => {
