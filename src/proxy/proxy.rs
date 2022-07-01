@@ -53,9 +53,7 @@ pub async fn connect_to_target_with_least_conn() -> (Option<tokio::net::TcpStrea
             Ok(s) => {
                 if SERVER_INFO.deref().server_config.lb_node.enable_local_endpoints &&
                     SERVER_INFO.deref().server_config.lb_node.local_endpoints.len() > 0 {
-                    let u = NODE_LOCAL_SELECTOR.deref().load(Ordering::Relaxed);
-                    NODE_LOCAL_SELECTOR.deref().store(u+1, Ordering::Relaxed);
-
+                    let u = NODE_LOCAL_SELECTOR.deref().fetch_add(1, Ordering::Relaxed);
                     let local_socket_addr : SocketAddr = SERVER_INFO.deref().server_config
                         .lb_node.local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))].parse()
                         .expect(&*format!("Invalid node local endpoint [{}]",
