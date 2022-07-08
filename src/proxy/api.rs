@@ -91,7 +91,7 @@ impl NodeConnectionInfoResp {
     pub fn new(_connect_id: String, _local_endpoint: String, _remote_endpoint: String, _create_time: i64,
                _read_speed_1m: u64, _read_speed_5m: u64, _read_speed_30m: u64,
                _write_speed_1m: u64, _write_speed_5m: u64, _write_speed_30m: u64) -> NodeConnectionInfoResp {
-        NodeConnectionInfoResp{
+        NodeConnectionInfoResp {
             connect_id: _connect_id,
             local_endpoint: _local_endpoint,
             remote_endpoint: _remote_endpoint,
@@ -125,7 +125,7 @@ impl TargetConnectionInfoResp {
     pub fn new(_connect_id: String, _local_endpoint: String, _remote_endpoint: String, _create_time: i64,
                _read_speed_1m: u64, _read_speed_5m: u64, _read_speed_30m: u64,
                _write_speed_1m: u64, _write_speed_5m: u64, _write_speed_30m: u64, _target_id: String) -> TargetConnectionInfoResp {
-        TargetConnectionInfoResp{
+        TargetConnectionInfoResp {
             connect_id: _connect_id,
             local_endpoint: _local_endpoint,
             remote_endpoint: _remote_endpoint,
@@ -170,37 +170,37 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
                 SERVER_INFO.deref().server_config.lb_node.listen.clone(),
                 SERVER_INFO.deref().server_config.lb_node.max_conn.clone(),
                 SERVER_INFO.deref().server_config.lb_node.timeout.clone(),
-                SERVER_INFO.deref().tunnel_info.lock().await.len() as u32
+                SERVER_INFO.deref().tunnel_info.read().await.len() as u32,
             );
             let json_resp = JsonResp::new(1, node_info_resp, None);
             let ret_str = serde_json::to_string(&json_resp).unwrap();
             Ok(Response::new(Body::from(ret_str)))
-        },
+        }
 
         (&Method::GET, "/api/get_targets_info") | (&Method::POST, "/api/get_targets_info") => {
             let mut targets_info_resp = vec![];
-            for (k, target) in SERVER_INFO.deref().targets_info.lock().await.iter() {
+            for (k, target) in SERVER_INFO.deref().targets_info.read().await.iter() {
                 let target_info_resp = TargetInfoResp::new(
                     k.clone(),
                     target.target_endpoint.clone(),
                     target.target_max_conn.clone(),
                     target.target_timeout.clone(),
                     get_target_conn_count_by_target_id(k.clone()).await,
-                    target.target_active.clone()
+                    target.target_active.clone(),
                 );
                 targets_info_resp.push(target_info_resp.clone());
             }
             let json_resp = JsonResp::new(1, targets_info_resp, None);
             let ret_str = serde_json::to_string(&json_resp).unwrap();
             Ok(Response::new(Body::from(ret_str)))
-        },
+        }
 
         (&Method::GET, "/api/get_target_tunnel_info") | (&Method::POST, "/api/get_target_tunnel_info") => {
             // try to parse query string params from url
             let mut params = req.uri().query()
-                    .map(|v| {
-                        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-                    }).unwrap_or_else(HashMap::new);
+                .map(|v| {
+                    url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
+                }).unwrap_or_else(HashMap::new);
 
             if params.len() == 0 {
                 // try to parse query string params from body
@@ -220,7 +220,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             };
 
             let mut target_tunnel_info = vec![];
-            for(k, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
+            for (k, v) in SERVER_INFO.deref().tunnel_info.read().await.iter() {
                 if target_id.deref() == v.1.target_id {
                     let (node_connection, target_connection) = v.clone();
                     let node_connection_resp = NodeConnectionInfoResp::new(
@@ -233,7 +233,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
                         node_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64,
                         node_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_1m) as u64,
                         node_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_5m) as u64,
-                        node_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64
+                        node_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64,
                     );
                     let target_connection_resp = TargetConnectionInfoResp::new(
                         target_connection.connection.connect_id.clone(),
@@ -246,10 +246,10 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
                         target_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_1m) as u64,
                         target_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_5m) as u64,
                         target_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_30m) as u64,
-                        v.1.target_id.clone()
+                        v.1.target_id.clone(),
                     );
                     let tunnel_info_resp = TunnelInfoResp::new(
-                        k.clone(), node_connection_resp, target_connection_resp
+                        k.clone(), node_connection_resp, target_connection_resp,
                     );
                     target_tunnel_info.push(tunnel_info_resp);
                 }
@@ -258,11 +258,11 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             let json_resp = JsonResp::new(1, target_tunnel_info, None);
             let ret_str = serde_json::to_string(&json_resp).unwrap();
             Ok(Response::new(Body::from(ret_str)))
-        },
+        }
 
         (&Method::GET, "/api/get_tunnel_info") | (&Method::POST, "/api/get_tunnel_info") => {
             let mut target_tunnel_info = vec![];
-            for(k, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
+            for (k, v) in SERVER_INFO.deref().tunnel_info.read().await.iter() {
                 let (node_connection, target_connection) = v.clone();
                 let node_connection_resp = NodeConnectionInfoResp::new(
                     node_connection.connection.connect_id.clone(),
@@ -274,7 +274,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
                     node_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64,
                     node_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_1m) as u64,
                     node_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_5m) as u64,
-                    node_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64
+                    node_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64,
                 );
                 let target_connection_resp = TargetConnectionInfoResp::new(
                     target_connection.connection.connect_id.clone(),
@@ -287,10 +287,10 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
                     target_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_1m) as u64,
                     target_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_5m) as u64,
                     target_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_30m) as u64,
-                    v.1.target_id.clone()
+                    v.1.target_id.clone(),
                 );
                 let tunnel_info_resp = TunnelInfoResp::new(
-                    k.clone(), node_connection_resp, target_connection_resp
+                    k.clone(), node_connection_resp, target_connection_resp,
                 );
                 target_tunnel_info.push(tunnel_info_resp);
             }
@@ -298,7 +298,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             let json_resp = JsonResp::new(1, target_tunnel_info, None);
             let ret_str = serde_json::to_string(&json_resp).unwrap();
             Ok(Response::new(Body::from(ret_str)))
-        },
+        }
 
         // Return the 404 Not Found for other routes.
         _ => {
@@ -309,7 +309,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
     }
 }
 
-pub async fn start_api_server() -> Result<(), Box<dyn Error>>{
+pub async fn start_api_server() -> Result<(), Box<dyn Error>> {
     let addr = SERVER_INFO.deref().server_config.lb_api.listen.clone().parse()?;
     let service = make_service_fn(|_| async {
         Ok::<_, hyper::Error>(service_fn(request_handler))

@@ -39,18 +39,18 @@ impl Target {
 
 pub fn calc_target_id_by_endpoint(endpoint: String) -> String {
     let digest = md5::compute(endpoint.as_str());
-    format!("{:x}",digest).to_string()
+    format!("{:x}", digest).to_string()
 }
 
 pub async fn init_targets_from_config() {
     for target_config in SERVER_INFO.deref().server_config.lb_targets.iter() {
-        let target= Target::new(
+        let target = Target::new(
             target_config.target_endpoint.clone(),
             target_config.target_max_conn,
             target_config.target_timeout,
             target_config.target_active, true);
 
-        SERVER_INFO.deref().targets_info.lock().await.insert(calc_target_id_by_endpoint(target.clone().target_endpoint),target);
+        SERVER_INFO.deref().targets_info.write().await.insert(calc_target_id_by_endpoint(target.clone().target_endpoint), target);
     }
 }
 
@@ -71,10 +71,10 @@ impl TargetDump {
 
 pub async fn dump_targets(order: TargetDumpOrder) -> Vec<TargetDump> {
     let mut target_dump_vec = Vec::<TargetDump>::new();
-    for (_, v) in SERVER_INFO.deref().targets_info.lock().await.iter(){
+    for (_, v) in SERVER_INFO.deref().targets_info.read().await.iter() {
         let target_conn_count = get_target_conn_count_by_target_id(calc_target_id_by_endpoint(v.target_endpoint.clone())).await;
-        let target_dump = TargetDump::new(v.target_endpoint.clone(), v.target_max_conn,  target_conn_count,
-                                           v.target_timeout, v.target_active, v.target_status);
+        let target_dump = TargetDump::new(v.target_endpoint.clone(), v.target_max_conn, target_conn_count,
+                                          v.target_timeout, v.target_active, v.target_status);
         target_dump_vec.push(target_dump);
     }
     match order {
