@@ -3,7 +3,6 @@ extern crate lazy_static;
 extern crate tokio;
 
 mod proxy;
-
 use proxy::target::{init_targets_from_config};
 use proxy::proxy::{start_tcp_proxy_server};
 use proxy::connection::{start_maintain_loop};
@@ -46,7 +45,7 @@ async fn run() {
 
     // init targets
     init_targets_from_config().await;
-    info!("targets init, count: {}", SERVER_INFO.deref().targets_info.read().await.len());
+    info!("targets init, count: {}", SERVER_INFO.deref().targets_info.lock().await.len());
 
     let fut_tcp_proxy_server = start_tcp_proxy_server();
     info!("starting tcp proxy server, listen on [{}]...", SERVER_INFO.deref().server_config.lb_node.listen.clone());
