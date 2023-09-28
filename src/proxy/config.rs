@@ -1,10 +1,10 @@
 // #[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
-use std::vec::Vec;
-use std::error::Error;
 use std::net::SocketAddr;
+use std::vec::Vec;
 
 const CONFIG_FILE_NAME: &'static str = "lb-config.json";
 
@@ -27,7 +27,7 @@ pub struct NodeConfig {
     pub max_conn: u32,
     pub timeout: u32,
     pub enable_local_endpoints: bool,
-    pub local_endpoints: Vec<String>
+    pub local_endpoints: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -45,17 +45,26 @@ pub struct ApiConfig {
 
 impl Config {
     pub fn check(&self) -> Result<(), Box<dyn Error>> {
-        let _ : SocketAddr = self.lb_node.listen.parse()
+        let _: SocketAddr = self
+            .lb_node
+            .listen
+            .parse()
             .expect(&*format!("Invalid node endpoint [{}]", self.lb_node.listen));
         for t in self.lb_node.local_endpoints.iter() {
-            let _ : SocketAddr = t.parse()
+            let _: SocketAddr = t
+                .parse()
                 .expect(&*format!("Invalid node local endpoint [{}]", t));
         }
         for t in self.lb_targets.iter() {
-            let _ : SocketAddr = t.target_endpoint.parse()
+            let _: SocketAddr = t
+                .target_endpoint
+                .parse()
                 .expect(&*format!("Invalid target endpoint [{}]", t.target_endpoint));
         }
-        let _ : SocketAddr = self.lb_api.listen.parse()
+        let _: SocketAddr = self
+            .lb_api
+            .listen
+            .parse()
             .expect(&*format!("Invalid api endpoint [{}]", self.lb_api.listen));
         Ok(())
     }
@@ -65,10 +74,11 @@ pub fn read_config() -> Config {
     let mut config_file = File::open(CONFIG_FILE_NAME)
         .expect(&*format!("Config file [{}] not found", CONFIG_FILE_NAME));
     let mut json_str = String::new();
-    config_file.read_to_string(&mut json_str)
+    config_file
+        .read_to_string(&mut json_str)
         .expect("Failure while reading config file to string");
-    let config: Config = serde_json::from_str(&json_str)
-        .expect("Failure while deserializing json config");
+    let config: Config =
+        serde_json::from_str(&json_str).expect("Failure while deserializing json config");
     config
 }
 

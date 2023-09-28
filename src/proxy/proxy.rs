@@ -1,20 +1,19 @@
+use std::error::Error;
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use std::error::Error;
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{Ordering};
 use std::net::SocketAddr;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
+use crate::proxy::config::read_config;
 use crate::proxy::config::Config;
-use crate::proxy::connection::{NodeConnection, TargetConnection, new_tunnel_id};
-use crate::proxy::target::{Target, TargetDumpOrder, calc_target_id_by_endpoint, dump_targets};
-use crate::proxy::config::{read_config};
-use crate::proxy::g::{SERVER_INFO,NODE_LOCAL_SELECTOR};
-use std::ops::Deref;
+use crate::proxy::connection::{new_tunnel_id, NodeConnection, TargetConnection};
+use crate::proxy::g::{NODE_LOCAL_SELECTOR, SERVER_INFO};
+use crate::proxy::target::{calc_target_id_by_endpoint, dump_targets, Target, TargetDumpOrder};
 use log::{error, info};
-
+use std::ops::Deref;
 
 #[derive(Debug)]
 pub struct ProxyServer {
@@ -24,7 +23,7 @@ pub struct ProxyServer {
 }
 
 impl ProxyServer {
-    pub fn new() -> ProxyServer{
+    pub fn new() -> ProxyServer {
         ProxyServer {
             server_config: read_config(),
             targets_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
@@ -33,7 +32,8 @@ impl ProxyServer {
     }
 }
 
-pub async fn connect_to_target_with_least_conn() -> (Option<tokio::net::TcpStream>, Option<Target>) {
+pub async fn connect_to_target_with_least_conn() -> (Option<tokio::net::TcpStream>, Option<Target>)
+{
     let targets_dump = dump_targets(TargetDumpOrder::AscOrder).await;
 
     let mut tcp_stream_target: Option<tokio::net::TcpStream> = None;
@@ -51,30 +51,67 @@ pub async fn connect_to_target_with_least_conn() -> (Option<tokio::net::TcpStrea
         let r = tokio::net::TcpSocket::new_v4();
         let socket_conn = match r {
             Ok(s) => {
-                if SERVER_INFO.deref().server_config.lb_node.enable_local_endpoints &&
-                    SERVER_INFO.deref().server_config.lb_node.local_endpoints.len() > 0 {
+                if SERVER_INFO
+                    .deref()
+                    .server_config
+                    .lb_node
+                    .enable_local_endpoints
+                    && SERVER_INFO
+                        .deref()
+                        .server_config
+                        .lb_node
+                        .local_endpoints
+                        .len()
+                        > 0
+                {
                     let u = NODE_LOCAL_SELECTOR.deref().fetch_add(1, Ordering::Relaxed);
-                    let local_socket_addr : SocketAddr = SERVER_INFO.deref().server_config
-                        .lb_node.local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))].parse()
-                        .expect(&*format!("Invalid node local endpoint [{}]",
-                                          SERVER_INFO.deref().server_config.lb_node
-                                              .local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))]));
+                    let local_socket_addr: SocketAddr =
+                        SERVER_INFO.deref().server_config.lb_node.local_endpoints[(u as usize
+                            % (SERVER_INFO
+                                .deref()
+                                .server_config
+                                .lb_node
+                                .local_endpoints
+                                .len()))]
+                        .parse()
+                        .expect(&*format!(
+                            "Invalid node local endpoint [{}]",
+                            SERVER_INFO.deref().server_config.lb_node.local_endpoints[(u as usize
+                                % (SERVER_INFO
+                                    .deref()
+                                    .server_config
+                                    .lb_node
+                                    .local_endpoints
+                                    .len()))]
+                        ));
 
-                    s.bind(local_socket_addr)
-                        .expect(&*format!("Bind node local endpoint [{}] fail",
-                                          SERVER_INFO.deref().server_config.lb_node
-                                              .local_endpoints[(u as usize % (SERVER_INFO.deref().server_config.lb_node.local_endpoints.len()))]));
+                    s.bind(local_socket_addr).expect(&*format!(
+                        "Bind node local endpoint [{}] fail",
+                        SERVER_INFO.deref().server_config.lb_node.local_endpoints[(u as usize
+                            % (SERVER_INFO
+                                .deref()
+                                .server_config
+                                .lb_node
+                                .local_endpoints
+                                .len()))]
+                    ));
                 }
                 Some(s)
-            },
-            Err(_) => continue
+            }
+            Err(_) => continue,
         };
         let connect_timeout = tokio::time::Duration::from_secs(5);
-        if let Ok(r) = tokio::time::timeout(connect_timeout,
-                                            socket_conn.unwrap().connect(t.target.target_endpoint.parse().unwrap())).await {
+        if let Ok(r) = tokio::time::timeout(
+            connect_timeout,
+            socket_conn
+                .unwrap()
+                .connect(t.target.target_endpoint.parse().unwrap()),
+        )
+        .await
+        {
             tcp_stream_target = match r {
                 Ok(c) => Some(c),
-                Err(_) => continue
+                Err(_) => continue,
             };
 
             conn_target_info = Some(t.target.clone());
@@ -84,12 +121,20 @@ pub async fn connect_to_target_with_least_conn() -> (Option<tokio::net::TcpStrea
         }
     }
 
-    return (tcp_stream_target, conn_target_info)
+    return (tcp_stream_target, conn_target_info);
 }
 
-pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
-    let node_listener = tokio::net::TcpListener::bind(SERVER_INFO.deref().server_config.lb_node.listen.as_str())
-        .await.expect(format!("Failure binding node listen endpoint [{}]", SERVER_INFO.deref().server_config.lb_node.listen).as_str());
+pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>> {
+    let node_listener =
+        tokio::net::TcpListener::bind(SERVER_INFO.deref().server_config.lb_node.listen.as_str())
+            .await
+            .expect(
+                format!(
+                    "Failure binding node listen endpoint [{}]",
+                    SERVER_INFO.deref().server_config.lb_node.listen
+                )
+                .as_str(),
+            );
 
     loop {
         let (mut tcp_stream_node, node_remote_addr) = node_listener.accept().await?;
@@ -114,21 +159,24 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
         let node_timeout = SERVER_INFO.deref().server_config.lb_node.timeout.clone();
         let target_timeout = conn_target_info.clone().unwrap().target_timeout.clone();
 
-        let conn_target_id = calc_target_id_by_endpoint(conn_target_info.clone().unwrap().target_endpoint);
+        let conn_target_id =
+            calc_target_id_by_endpoint(conn_target_info.clone().unwrap().target_endpoint);
         let tcp_stream_target = tcp_stream_target.unwrap();
         let target_local_addr = tcp_stream_target.local_addr().unwrap().to_string();
 
         let (mut tcp_stream_node_read, mut tcp_stream_node_write) = tcp_stream_node.into_split();
-        let (mut tcp_stream_target_read, mut tcp_stream_target_write) = tcp_stream_target.into_split();
+        let (mut tcp_stream_target_read, mut tcp_stream_target_write) =
+            tcp_stream_target.into_split();
 
         let node_connection_info = NodeConnection::new(
             SERVER_INFO.deref().server_config.lb_node.listen.clone(),
-            node_remote_addr.to_string());
+            node_remote_addr.to_string(),
+        );
 
         let target_connection_info = TargetConnection::new(
             target_local_addr.clone(),
             conn_target_info.clone().unwrap().target_endpoint,
-            conn_target_id
+            conn_target_id,
         );
 
         let tunnel_id = new_tunnel_id();
@@ -136,13 +184,18 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
         let tunnel_id_dump = tunnel_id.clone();
         let tunnel_info_arc_dump = Arc::clone(&tunnel_info_arc);
 
-        SERVER_INFO.deref().tunnel_info.lock().await.insert(tunnel_id.clone(), (node_connection_info, target_connection_info));
-        info!("build tunnel |{}| successfully, node: {}->{}, target: {}->{}",
-                 tunnel_id,
-                 node_remote_addr.to_string(),
-                 SERVER_INFO.deref().server_config.lb_node.listen.clone(),
-                 target_local_addr.clone(),
-                 conn_target_info.clone().unwrap().target_endpoint);
+        SERVER_INFO.deref().tunnel_info.lock().await.insert(
+            tunnel_id.clone(),
+            (node_connection_info, target_connection_info),
+        );
+        info!(
+            "build tunnel |{}| successfully, node: {}->{}, target: {}->{}",
+            tunnel_id,
+            node_remote_addr.to_string(),
+            SERVER_INFO.deref().server_config.lb_node.listen.clone(),
+            target_local_addr.clone(),
+            conn_target_info.clone().unwrap().target_endpoint
+        );
 
         // task of reading from node connection and then writing to target connection
         tokio::spawn(async move {
@@ -150,13 +203,15 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
             let mut count;
             loop {
                 let read_timeout = tokio::time::Duration::from_secs(node_timeout as u64);
-                if let Ok(r) = tokio::time::timeout(read_timeout, tcp_stream_node_read.read(&mut buf)).await {
+                if let Ok(r) =
+                    tokio::time::timeout(read_timeout, tcp_stream_node_read.read(&mut buf)).await
+                {
                     match r {
                         Ok(n) if n == 0 => {
                             tunnel_info_arc.lock().await.remove(&tunnel_id);
                             info!("|{}| tcp_stream_node_read: closed by remote", tunnel_id);
                             return;
-                        },
+                        }
                         Ok(n) => {
                             count = n;
                             let tunnel_info = tunnel_info_arc.lock().await;
@@ -167,19 +222,28 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                                     let target_info_dump = target_info.clone();
                                     node_info_dump.add_read_n(n as u64);
                                     drop(tunnel_info);
-                                    tunnel_info_arc.lock().await.insert(tunnel_id.clone(), (node_info_dump, target_info_dump));
-                                },
+                                    tunnel_info_arc.lock().await.insert(
+                                        tunnel_id.clone(),
+                                        (node_info_dump, target_info_dump),
+                                    );
+                                }
                                 None => {
                                     drop(tunnel_info);
                                     tunnel_info_arc.lock().await.remove(&tunnel_id);
-                                    error!("|{}| tcp_stream_node_read: not find, disconnect", tunnel_id);
+                                    error!(
+                                        "|{}| tcp_stream_node_read: not find, disconnect",
+                                        tunnel_id
+                                    );
                                     return;
-                                },
+                                }
                             }
-                        },
+                        }
                         Err(e) => {
                             tunnel_info_arc.lock().await.remove(&tunnel_id.clone());
-                            error!("|{}| tcp_stream_node_read: failed to read from socket; err = {:?}", tunnel_id, e);
+                            error!(
+                                "|{}| tcp_stream_node_read: failed to read from socket; err = {:?}",
+                                tunnel_id, e
+                            );
                             return;
                         }
                     };
@@ -191,7 +255,12 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                 }
 
                 let write_timeout = tokio::time::Duration::from_secs(target_timeout as u64);
-                if let Ok(r) = tokio::time::timeout(write_timeout, tcp_stream_target_write.write_all(&buf[0..count])).await {
+                if let Ok(r) = tokio::time::timeout(
+                    write_timeout,
+                    tcp_stream_target_write.write_all(&buf[0..count]),
+                )
+                .await
+                {
                     match r {
                         Ok(_) => {
                             let tunnel_info = tunnel_info_arc.lock().await;
@@ -202,14 +271,20 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                                     let mut target_info_dump = target_info.clone();
                                     target_info_dump.add_write_n(count as u64);
                                     drop(tunnel_info);
-                                    tunnel_info_arc.lock().await.insert(tunnel_id.clone(), (node_info_dump, target_info_dump));
-                                },
+                                    tunnel_info_arc.lock().await.insert(
+                                        tunnel_id.clone(),
+                                        (node_info_dump, target_info_dump),
+                                    );
+                                }
                                 None => {
                                     drop(tunnel_info);
                                     tunnel_info_arc.lock().await.remove(&tunnel_id);
-                                    error!("|{}| tcp_stream_target_write: not find, disconnect", tunnel_id);
+                                    error!(
+                                        "|{}| tcp_stream_target_write: not find, disconnect",
+                                        tunnel_id
+                                    );
                                     return;
-                                },
+                                }
                             }
                         }
                         Err(e) => {
@@ -233,13 +308,18 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
             let mut count;
             loop {
                 let read_timeout = tokio::time::Duration::from_secs(target_timeout as u64);
-                if let Ok(r) = tokio::time::timeout(read_timeout, tcp_stream_target_read.read(&mut buf)).await {
+                if let Ok(r) =
+                    tokio::time::timeout(read_timeout, tcp_stream_target_read.read(&mut buf)).await
+                {
                     match r {
                         Ok(n) if n == 0 => {
                             tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                            info!("|{}| tcp_stream_target_read: closed by remote", tunnel_id_dump);
-                            return
-                        },
+                            info!(
+                                "|{}| tcp_stream_target_read: closed by remote",
+                                tunnel_id_dump
+                            );
+                            return;
+                        }
                         Ok(n) => {
                             count = n;
                             let tunnel_info = tunnel_info_arc_dump.lock().await;
@@ -250,16 +330,22 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                                     let mut target_info_dump = target_info.clone();
                                     target_info_dump.add_read_n(n as u64);
                                     drop(tunnel_info);
-                                    tunnel_info_arc_dump.lock().await.insert(tunnel_id_dump.clone(), (node_info_dump, target_info_dump));
-                                },
+                                    tunnel_info_arc_dump.lock().await.insert(
+                                        tunnel_id_dump.clone(),
+                                        (node_info_dump, target_info_dump),
+                                    );
+                                }
                                 None => {
                                     drop(tunnel_info);
                                     tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                                    error!("|{}| tcp_stream_target_read: not find, disconnect", tunnel_id_dump);
-                                    return
-                                },
+                                    error!(
+                                        "|{}| tcp_stream_target_read: not find, disconnect",
+                                        tunnel_id_dump
+                                    );
+                                    return;
+                                }
                             }
-                        },
+                        }
                         Err(e) => {
                             tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
                             error!("|{}| tcp_stream_target_read: failed to read from socket; err = {:?}", tunnel_id_dump, e);
@@ -274,32 +360,44 @@ pub async fn start_tcp_proxy_server() -> Result<(), Box<dyn Error>>{
                 }
 
                 let write_timeout = tokio::time::Duration::from_secs(node_timeout as u64);
-                if let Ok(r) = tokio::time::timeout(write_timeout, tcp_stream_node_write.write_all(&buf[0..count])).await {
+                if let Ok(r) = tokio::time::timeout(
+                    write_timeout,
+                    tcp_stream_node_write.write_all(&buf[0..count]),
+                )
+                .await
+                {
                     match r {
                         Ok(_) => {
-                            {
-                                let tunnel_info = tunnel_info_arc_dump.lock().await;
-                                let v = tunnel_info.get(&tunnel_id_dump);
-                                match v {
-                                    Some((node_info, target_info)) => {
-                                        let mut node_info_dump = node_info.clone();
-                                        let target_info_dump = target_info.clone();
-                                        node_info_dump.add_write_n(count as u64);
-                                        drop(tunnel_info);
-                                        tunnel_info_arc_dump.lock().await.insert(tunnel_id_dump.clone(), (node_info_dump, target_info_dump));
-                                    },
-                                    None => {
-                                        drop(tunnel_info);
-                                        tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                                        error!("|{}| tcp_stream_node_write: not find, disconnect", tunnel_id_dump);
-                                        return;
-                                    },
+                            let tunnel_info = tunnel_info_arc_dump.lock().await;
+                            let v = tunnel_info.get(&tunnel_id_dump);
+                            match v {
+                                Some((node_info, target_info)) => {
+                                    let mut node_info_dump = node_info.clone();
+                                    let target_info_dump = target_info.clone();
+                                    node_info_dump.add_write_n(count as u64);
+                                    drop(tunnel_info);
+                                    tunnel_info_arc_dump.lock().await.insert(
+                                        tunnel_id_dump.clone(),
+                                        (node_info_dump, target_info_dump),
+                                    );
+                                }
+                                None => {
+                                    drop(tunnel_info);
+                                    tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
+                                    error!(
+                                        "|{}| tcp_stream_node_write: not find, disconnect",
+                                        tunnel_id_dump
+                                    );
+                                    return;
                                 }
                             }
                         }
                         Err(e) => {
                             tunnel_info_arc_dump.lock().await.remove(&tunnel_id_dump);
-                            error!("|{}| tcp_stream_node_write: failed to write to socket; err = {:?}", tunnel_id_dump, e);
+                            error!(
+                                "|{}| tcp_stream_node_write: failed to write to socket; err = {:?}",
+                                tunnel_id_dump, e
+                            );
                             return;
                         }
                     }

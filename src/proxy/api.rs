@@ -1,18 +1,17 @@
 // #[macro_use]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use std::error::Error;
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 
-use crate::proxy::g::SERVER_INFO;
-use std::ops::Deref;
-use std::collections::HashMap;
-use url::form_urlencoded;
 use crate::proxy::connection::get_target_conn_count_by_target_id;
+use crate::proxy::g::SERVER_INFO;
 use chrono::Utc;
-
+use std::collections::HashMap;
+use std::ops::Deref;
+use url::form_urlencoded;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct JsonResp<T> {
@@ -61,7 +60,14 @@ struct TargetInfoResp {
 }
 
 impl TargetInfoResp {
-    pub fn new(_target_id: String, _endpoint: String, _max_conn: u32, _timeout: u32, _conn_count: u32, _active: bool) -> TargetInfoResp {
+    pub fn new(
+        _target_id: String,
+        _endpoint: String,
+        _max_conn: u32,
+        _timeout: u32,
+        _conn_count: u32,
+        _active: bool,
+    ) -> TargetInfoResp {
         TargetInfoResp {
             target_id: _target_id,
             endpoint: _endpoint,
@@ -88,10 +94,19 @@ struct NodeConnectionInfoResp {
 }
 
 impl NodeConnectionInfoResp {
-    pub fn new(_connect_id: String, _local_endpoint: String, _remote_endpoint: String, _create_time: i64,
-               _read_speed_1m: u64, _read_speed_5m: u64, _read_speed_30m: u64,
-               _write_speed_1m: u64, _write_speed_5m: u64, _write_speed_30m: u64) -> NodeConnectionInfoResp {
-        NodeConnectionInfoResp{
+    pub fn new(
+        _connect_id: String,
+        _local_endpoint: String,
+        _remote_endpoint: String,
+        _create_time: i64,
+        _read_speed_1m: u64,
+        _read_speed_5m: u64,
+        _read_speed_30m: u64,
+        _write_speed_1m: u64,
+        _write_speed_5m: u64,
+        _write_speed_30m: u64,
+    ) -> NodeConnectionInfoResp {
+        NodeConnectionInfoResp {
             connect_id: _connect_id,
             local_endpoint: _local_endpoint,
             remote_endpoint: _remote_endpoint,
@@ -122,10 +137,20 @@ struct TargetConnectionInfoResp {
 }
 
 impl TargetConnectionInfoResp {
-    pub fn new(_connect_id: String, _local_endpoint: String, _remote_endpoint: String, _create_time: i64,
-               _read_speed_1m: u64, _read_speed_5m: u64, _read_speed_30m: u64,
-               _write_speed_1m: u64, _write_speed_5m: u64, _write_speed_30m: u64, _target_id: String) -> TargetConnectionInfoResp {
-        TargetConnectionInfoResp{
+    pub fn new(
+        _connect_id: String,
+        _local_endpoint: String,
+        _remote_endpoint: String,
+        _create_time: i64,
+        _read_speed_1m: u64,
+        _read_speed_5m: u64,
+        _read_speed_30m: u64,
+        _write_speed_1m: u64,
+        _write_speed_5m: u64,
+        _write_speed_30m: u64,
+        _target_id: String,
+    ) -> TargetConnectionInfoResp {
+        TargetConnectionInfoResp {
             connect_id: _connect_id,
             local_endpoint: _local_endpoint,
             remote_endpoint: _remote_endpoint,
@@ -149,7 +174,11 @@ struct TunnelInfoResp {
 }
 
 impl TunnelInfoResp {
-    pub fn new(_tunnel_id: String, _node_connection: NodeConnectionInfoResp, _target_connection: TargetConnectionInfoResp) -> TunnelInfoResp {
+    pub fn new(
+        _tunnel_id: String,
+        _node_connection: NodeConnectionInfoResp,
+        _target_connection: TargetConnectionInfoResp,
+    ) -> TunnelInfoResp {
         TunnelInfoResp {
             tunnel_id: _tunnel_id,
             node_connection: _node_connection,
@@ -161,21 +190,21 @@ impl TunnelInfoResp {
 async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     match (req.method(), req.uri().path()) {
         // Serve some instructions at /
-        (&Method::GET, "/") | (&Method::POST, "/") => Ok(Response::new(Body::from(
-            "<h1>Hello World</h1>",
-        ))),
+        (&Method::GET, "/") | (&Method::POST, "/") => {
+            Ok(Response::new(Body::from("<h1>Hello World</h1>")))
+        }
 
         (&Method::GET, "/api/get_node_info") | (&Method::POST, "/api/get_node_info") => {
             let node_info_resp = NodeInfoResp::new(
                 SERVER_INFO.deref().server_config.lb_node.listen.clone(),
                 SERVER_INFO.deref().server_config.lb_node.max_conn.clone(),
                 SERVER_INFO.deref().server_config.lb_node.timeout.clone(),
-                SERVER_INFO.deref().tunnel_info.lock().await.len() as u32
+                SERVER_INFO.deref().tunnel_info.lock().await.len() as u32,
             );
             let json_resp = JsonResp::new(1, node_info_resp, None);
             let ret_str = serde_json::to_string(&json_resp).unwrap();
             Ok(Response::new(Body::from(ret_str)))
-        },
+        }
 
         (&Method::GET, "/api/get_targets_info") | (&Method::POST, "/api/get_targets_info") => {
             let mut targets_info_resp = vec![];
@@ -186,21 +215,27 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
                     target.target_max_conn.clone(),
                     target.target_timeout.clone(),
                     get_target_conn_count_by_target_id(k.clone()).await,
-                    target.target_active.clone()
+                    target.target_active.clone(),
                 );
                 targets_info_resp.push(target_info_resp.clone());
             }
             let json_resp = JsonResp::new(1, targets_info_resp, None);
             let ret_str = serde_json::to_string(&json_resp).unwrap();
             Ok(Response::new(Body::from(ret_str)))
-        },
+        }
 
-        (&Method::GET, "/api/get_target_tunnel_info") | (&Method::POST, "/api/get_target_tunnel_info") => {
+        (&Method::GET, "/api/get_target_tunnel_info")
+        | (&Method::POST, "/api/get_target_tunnel_info") => {
             // try to parse query string params from url
-            let mut params = req.uri().query()
-                    .map(|v| {
-                        url::form_urlencoded::parse(v.as_bytes()).into_owned().collect()
-                    }).unwrap_or_else(HashMap::new);
+            let mut params = req
+                .uri()
+                .query()
+                .map(|v| {
+                    url::form_urlencoded::parse(v.as_bytes())
+                        .into_owned()
+                        .collect()
+                })
+                .unwrap_or_else(HashMap::new);
 
             if params.len() == 0 {
                 // try to parse query string params from body
@@ -220,7 +255,7 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             };
 
             let mut target_tunnel_info = vec![];
-            for(k, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
+            for (k, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
                 if target_id.deref() == v.1.target_id {
                     let (node_connection, target_connection) = v.clone();
                     let node_connection_resp = NodeConnectionInfoResp::new(
@@ -228,28 +263,66 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
                         node_connection.connection.local_endpoint.clone(),
                         node_connection.connection.remote_endpoint.clone(),
                         node_connection.connection.create_time.clone(),
-                        node_connection.connection.read_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_1m) as u64,
-                        node_connection.connection.read_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_5m) as u64,
-                        node_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64,
-                        node_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_1m) as u64,
-                        node_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_5m) as u64,
-                        node_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64
+                        node_connection.connection.read_bytes_1m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - node_connection.connection.start_time_1m)
+                                as u64,
+                        node_connection.connection.read_bytes_5m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - node_connection.connection.start_time_5m)
+                                as u64,
+                        node_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - node_connection.connection.start_time_30m)
+                                as u64,
+                        node_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - node_connection.connection.start_time_1m)
+                                as u64,
+                        node_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - node_connection.connection.start_time_5m)
+                                as u64,
+                        node_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - node_connection.connection.start_time_30m)
+                                as u64,
                     );
                     let target_connection_resp = TargetConnectionInfoResp::new(
                         target_connection.connection.connect_id.clone(),
                         target_connection.connection.local_endpoint.clone(),
                         target_connection.connection.remote_endpoint.clone(),
                         target_connection.connection.create_time.clone(),
-                        target_connection.connection.read_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_1m) as u64,
-                        target_connection.connection.read_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_5m) as u64,
-                        target_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_30m) as u64,
-                        target_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_1m) as u64,
-                        target_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_5m) as u64,
-                        target_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_30m) as u64,
-                        v.1.target_id.clone()
+                        target_connection.connection.read_bytes_1m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - target_connection.connection.start_time_1m)
+                                as u64,
+                        target_connection.connection.read_bytes_5m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - target_connection.connection.start_time_5m)
+                                as u64,
+                        target_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - target_connection.connection.start_time_30m)
+                                as u64,
+                        target_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - target_connection.connection.start_time_1m)
+                                as u64,
+                        target_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - target_connection.connection.start_time_5m)
+                                as u64,
+                        target_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64
+                            / (Utc::now().timestamp_nanos()
+                                - target_connection.connection.start_time_30m)
+                                as u64,
+                        v.1.target_id.clone(),
                     );
                     let tunnel_info_resp = TunnelInfoResp::new(
-                        k.clone(), node_connection_resp, target_connection_resp
+                        k.clone(),
+                        node_connection_resp,
+                        target_connection_resp,
                     );
                     target_tunnel_info.push(tunnel_info_resp);
                 }
@@ -258,47 +331,76 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
             let json_resp = JsonResp::new(1, target_tunnel_info, None);
             let ret_str = serde_json::to_string(&json_resp).unwrap();
             Ok(Response::new(Body::from(ret_str)))
-        },
+        }
 
         (&Method::GET, "/api/get_tunnel_info") | (&Method::POST, "/api/get_tunnel_info") => {
             let mut target_tunnel_info = vec![];
-            for(k, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
+            for (k, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter() {
                 let (node_connection, target_connection) = v.clone();
                 let node_connection_resp = NodeConnectionInfoResp::new(
                     node_connection.connection.connect_id.clone(),
                     node_connection.connection.local_endpoint.clone(),
                     node_connection.connection.remote_endpoint.clone(),
                     node_connection.connection.create_time.clone(),
-                    node_connection.connection.read_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_1m) as u64,
-                    node_connection.connection.read_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_5m) as u64,
-                    node_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64,
-                    node_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_1m) as u64,
-                    node_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_5m) as u64,
-                    node_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m) as u64
+                    node_connection.connection.read_bytes_1m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_1m)
+                            as u64,
+                    node_connection.connection.read_bytes_5m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_5m)
+                            as u64,
+                    node_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m)
+                            as u64,
+                    node_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_1m)
+                            as u64,
+                    node_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_5m)
+                            as u64,
+                    node_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos() - node_connection.connection.start_time_30m)
+                            as u64,
                 );
                 let target_connection_resp = TargetConnectionInfoResp::new(
                     target_connection.connection.connect_id.clone(),
                     target_connection.connection.local_endpoint.clone(),
                     target_connection.connection.remote_endpoint.clone(),
                     target_connection.connection.create_time.clone(),
-                    target_connection.connection.read_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_1m) as u64,
-                    target_connection.connection.read_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_5m) as u64,
-                    target_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_30m) as u64,
-                    target_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_1m) as u64,
-                    target_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_5m) as u64,
-                    target_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64 / (Utc::now().timestamp_nanos() - target_connection.connection.start_time_30m) as u64,
-                    v.1.target_id.clone()
+                    target_connection.connection.read_bytes_1m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos()
+                            - target_connection.connection.start_time_1m)
+                            as u64,
+                    target_connection.connection.read_bytes_5m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos()
+                            - target_connection.connection.start_time_5m)
+                            as u64,
+                    target_connection.connection.read_bytes_30m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos()
+                            - target_connection.connection.start_time_30m)
+                            as u64,
+                    target_connection.connection.write_bytes_1m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos()
+                            - target_connection.connection.start_time_1m)
+                            as u64,
+                    target_connection.connection.write_bytes_5m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos()
+                            - target_connection.connection.start_time_5m)
+                            as u64,
+                    target_connection.connection.write_bytes_30m * 8 as u64 * 1000000000 as u64
+                        / (Utc::now().timestamp_nanos()
+                            - target_connection.connection.start_time_30m)
+                            as u64,
+                    v.1.target_id.clone(),
                 );
-                let tunnel_info_resp = TunnelInfoResp::new(
-                    k.clone(), node_connection_resp, target_connection_resp
-                );
+                let tunnel_info_resp =
+                    TunnelInfoResp::new(k.clone(), node_connection_resp, target_connection_resp);
                 target_tunnel_info.push(tunnel_info_resp);
             }
 
             let json_resp = JsonResp::new(1, target_tunnel_info, None);
             let ret_str = serde_json::to_string(&json_resp).unwrap();
             Ok(Response::new(Body::from(ret_str)))
-        },
+        }
 
         // Return the 404 Not Found for other routes.
         _ => {
@@ -309,11 +411,15 @@ async fn request_handler(req: Request<Body>) -> Result<Response<Body>, hyper::Er
     }
 }
 
-pub async fn start_api_server() -> Result<(), Box<dyn Error>>{
-    let addr = SERVER_INFO.deref().server_config.lb_api.listen.clone().parse()?;
-    let service = make_service_fn(|_| async {
-        Ok::<_, hyper::Error>(service_fn(request_handler))
-    });
+pub async fn start_api_server() -> Result<(), Box<dyn Error>> {
+    let addr = SERVER_INFO
+        .deref()
+        .server_config
+        .lb_api
+        .listen
+        .clone()
+        .parse()?;
+    let service = make_service_fn(|_| async { Ok::<_, hyper::Error>(service_fn(request_handler)) });
     let server = Server::bind(&addr).serve(service);
     server.await?;
     Ok(())

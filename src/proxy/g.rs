@@ -1,5 +1,5 @@
 use crate::proxy::proxy::ProxyServer;
-use std::sync::atomic::{AtomicU64};
+use std::sync::atomic::AtomicU64;
 
 lazy_static! {
     pub static ref SERVER_INFO: ProxyServer = ProxyServer::new();

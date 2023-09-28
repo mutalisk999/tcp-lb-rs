@@ -1,11 +1,10 @@
 use uuid::Uuid;
 
 use crate::proxy::g::SERVER_INFO;
-use std::ops::Deref;
 use chrono::Utc;
 use std::error::Error;
+use std::ops::Deref;
 use tokio;
-
 
 #[derive(Debug, Clone)]
 pub struct Connection {
@@ -102,9 +101,14 @@ pub struct TargetConnection {
 }
 
 impl TargetConnection {
-    pub fn new(local_endpoint: String, remote_endpoint: String, target_id: String) -> TargetConnection {
+    pub fn new(
+        local_endpoint: String,
+        remote_endpoint: String,
+        target_id: String,
+    ) -> TargetConnection {
         TargetConnection {
-            connection: Connection::new(local_endpoint, remote_endpoint), target_id,
+            connection: Connection::new(local_endpoint, remote_endpoint),
+            target_id,
         }
     }
 
@@ -129,12 +133,12 @@ pub async fn get_target_conn_count_by_target_id(target_id: String) -> u32 {
 
 pub fn new_connection_id() -> String {
     let connection_id = Uuid::new_v4();
-    format!("{:x}",connection_id).to_string()
+    format!("{:x}", connection_id).to_string()
 }
 
 pub fn new_tunnel_id() -> String {
     let tunnel_id = Uuid::new_v4();
-    format!("{:x}",tunnel_id).to_string()
+    format!("{:x}", tunnel_id).to_string()
 }
 
 pub async fn start_maintain_loop() -> Result<(), Box<dyn Error>> {
@@ -143,25 +147,31 @@ pub async fn start_maintain_loop() -> Result<(), Box<dyn Error>> {
         tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 
         if maintain_index.clone() % 1 == 0 {
-            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut(){
+            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut() {
                 let mut node_connection_dump = v.0.clone();
                 node_connection_dump.connection.reset_read_write_bytes_1m();
                 let mut target_connection_dump = v.1.clone();
-                target_connection_dump.connection.reset_read_write_bytes_1m();
+                target_connection_dump
+                    .connection
+                    .reset_read_write_bytes_1m();
             }
         } else if maintain_index.clone() % 5 == 0 {
-            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut(){
+            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut() {
                 let mut node_connection_dump = v.0.clone();
                 node_connection_dump.connection.reset_read_write_bytes_5m();
                 let mut target_connection_dump = v.1.clone();
-                target_connection_dump.connection.reset_read_write_bytes_5m();
+                target_connection_dump
+                    .connection
+                    .reset_read_write_bytes_5m();
             }
         } else if maintain_index.clone() % 30 == 0 {
-            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut(){
+            for (_, v) in SERVER_INFO.deref().tunnel_info.lock().await.iter_mut() {
                 let mut node_connection_dump = v.0.clone();
                 node_connection_dump.connection.reset_read_write_bytes_30m();
                 let mut target_connection_dump = v.1.clone();
-                target_connection_dump.connection.reset_read_write_bytes_30m();
+                target_connection_dump
+                    .connection
+                    .reset_read_write_bytes_30m();
             }
         }
 
